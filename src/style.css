@@ -50,7 +50,7 @@ button:disabled {
   background: var(--bar);
   color: #fff;
   position: relative;
-  z-index: 20;
+  z-index: 90;
 }
 
 .brand {
@@ -281,16 +281,48 @@ button:disabled {
   height: auto;
 }
 
-#console-panel.collapsed #console-output {
-  display: none;
+#console-panel.collapsed .panel-body {
+  display: none !important;
 }
 
-#console-output {
+.panel-body {
   flex: 1;
   overflow: auto;
   padding: 6px 10px;
   font: 14px/1.45 ui-monospace, "Cascadia Code", Menlo, monospace;
+}
+
+#console-output {
   white-space: pre-wrap;
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 2px 6px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.tab.active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
+.hint {
+  margin: 0 0 6px;
+  font: 12px system-ui, sans-serif;
+  color: var(--muted);
+}
+
+#monitor-table td {
+  padding: 1px 16px 1px 0;
 }
 
 #console-output .err {
@@ -315,7 +347,8 @@ button:disabled {
   flex-direction: column;
   overflow: hidden;
   resize: both;
-  z-index: 10;
+  /* Above Blockly's toolbox and scrollbars (z-index 70). */
+  z-index: 80;
 }
 
 #playground-window.expanded {
@@ -372,6 +405,20 @@ button:disabled {
   font: 600 12px ui-monospace, monospace;
   padding: 3px 8px;
   border-radius: 6px;
+}
+
+#pw-status {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  background: rgba(35, 38, 58, 0.85);
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  white-space: nowrap;
 }
 
 #dashboard {
@@ -443,7 +490,7 @@ button:disabled {
   position: fixed;
   inset: 0;
   background: rgba(20, 22, 35, 0.55);
-  z-index: 50;
+  z-index: 100;
   display: grid;
   place-items: center;
 }

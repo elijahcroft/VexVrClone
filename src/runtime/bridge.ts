@@ -26,6 +26,7 @@ export interface VrBridge {
   console_set_color(color: string): void;
   report_error(message: string, line: number): void;
   on_program_stopped(): void;
+  monitor_add(kind: "variable" | "sensor", name: string): void;
   device_list(): DeviceInfo[];
   device(name: string): unknown;
 }
@@ -51,6 +52,16 @@ export function stopProgram(py: PyodideAPI) {
   const runtime = py.pyimport("vexcode_vr");
   runtime.stop_project();
   runtime.destroy();
+}
+
+/** Display strings for monitored global variables. */
+export function monitorValues(py: PyodideAPI, names: string[]): string[] {
+  const runtime = py.pyimport("vexcode_vr");
+  const proxy = runtime._vr_monitor_values(names);
+  const values = proxy.toJs() as string[];
+  proxy.destroy();
+  runtime.destroy();
+  return values;
 }
 
 /** Tell Python a sensor event fired (e.g. "left_bumper.pressed"). */

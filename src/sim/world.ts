@@ -34,11 +34,14 @@ export interface SimObject {
   body: RAPIER.RigidBody;
   shape: Shape;
   color: number;
-  /** Free-form tag playgrounds use to find their objects (e.g. "disk"). */
+  /** Free-form tag playgrounds use to find their objects (e.g. "disk").
+   * "floor" means sensors treat it as ground (e.g. a raised table). */
   tag?: string;
   /** Eye-sensor color, if the object reads as one. */
   eyeColor?: "RED" | "GREEN" | "BLUE";
   removed?: boolean;
+  /** Carried by the magnet; sensors ignore it. */
+  held?: boolean;
 }
 
 interface Waiter {
@@ -51,8 +54,11 @@ export const STEP = 1 / 60;
 export class World {
   readonly physics: RAPIER.World;
   readonly objects: SimObject[] = [];
+  private byCollider = new Map<number, SimObject>();
   /** Simulated seconds since reset. */
   time = 0;
+  /** Counts promises resolved by the sim (moves done, waits over). */
+  settled = 0;
   private waiters: Waiter[] = [];
   private stepHooks: ((dt: number) => void)[] = [];
   private afterStepHooks: (() => void)[] = [];
@@ -85,6 +91,7 @@ export class World {
     if (due.length) {
       this.waiters = this.waiters.filter((w) => w.until > this.time + 1e-9);
       for (const w of due) w.resolve();
+      this.settled += due.length;
     }
   }
 
@@ -126,15 +133,29 @@ export class World {
         ? RAPIER.ColliderDesc.cuboid((shape.w / 2) * MM, (height / 2) * MM, (shape.d / 2) * MM)
         : RAPIER.ColliderDesc.cylinder((height / 2) * MM, shape.r * MM);
     col.setFriction(opts.friction ?? 0.5).setDensity(opts.density ?? 500);
-    this.physics.createCollider(col, body);
+    const collider = this.physics.createCollider(col, body);
     const obj: SimObject = { body, shape, color: opts.color, tag: opts.tag, eyeColor: opts.eyeColor };
     this.objects.push(obj);
+    this.byCollider.set(collider.handle, obj);
     return obj;
   }
 
-  /** Flat floor slab with its top at z = 0, centered on the origin. */
-  addFloor(width: number, depth: number) {
-    const desc = RAPIER.RigidBodyDesc.fixed().setTranslation(0, -0.05, 0);
+  /** The object a collider belongs to (undefined for the plain floor). */
+  objectFor(collider: RAPIER.Collider) {
+    return this.byCollider.get(collider.handle);
+  }
+
+  /** Take an object out of play (collected, fell off, ...). */
+  remove(obj: SimObject) {
+    if (obj.removed) return;
+    obj.removed = true;
+    this.byCollider.delete(obj.body.collider(0).handle);
+    this.physics.removeRigidBody(obj.body);
+  }
+
+  /** Flat floor slab with its top at z (mm), centered on the origin. */
+  addFloor(width: number, depth: number, z = 0) {
+    const desc = RAPIER.RigidBodyDesc.fixed().setTranslation(0, z * MM - 0.05, 0);
     const body = this.physics.createRigidBody(desc);
     this.physics.createCollider(
       RAPIER.ColliderDesc.cuboid((width / 2) * MM, 0.05, (depth / 2) * MM).setFriction(0.5),

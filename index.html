@@ -56,13 +56,20 @@
 
       <section id="console-panel">
         <div class="panel-head">
-          <span>Print Console</span>
+          <div class="tabs" role="tablist">
+            <button class="tab active" data-tab="console-output" role="tab">Print Console</button>
+            <button class="tab" data-tab="monitor-output" role="tab">Monitor</button>
+          </div>
           <div>
             <button class="small-btn" id="console-clear">Clear</button>
             <button class="small-btn" id="console-toggle">Hide</button>
           </div>
         </div>
-        <div id="console-output" role="log" aria-live="polite"></div>
+        <div id="console-output" class="panel-body" role="log" aria-live="polite"></div>
+        <div id="monitor-output" class="panel-body" hidden>
+          <p class="hint">Python: <code>monitor_variable("score")</code> or <code>monitor_sensor("front_eye.brightness")</code> shows values here while the project runs.</p>
+          <table id="monitor-table"></table>
+        </div>
       </section>
 
       <section id="playground-window">
@@ -76,6 +83,7 @@
         <div class="pw-view" id="pw-view">
           <div id="dashboard" hidden></div>
           <div id="pw-timer">0.0 s</div>
+          <div id="pw-status" hidden></div>
         </div>
         <div class="pw-bar">
           <div class="seg" role="group" aria-label="Camera">
@@ -83,6 +91,7 @@
             <button data-camera="aligned">Follow</button>
             <button data-camera="free">Free</button>
           </div>
+          <select id="pw-start" class="small-btn" aria-label="Starting position" hidden></select>
           <button class="small-btn" id="pw-dashboard">Dashboard</button>
           <button class="small-btn" id="pw-reset">↺ Reset</button>
         </div>

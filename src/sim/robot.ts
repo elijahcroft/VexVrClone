@@ -1,6 +1,8 @@
 import RAPIER from "@dimforge/rapier3d-compat";
 import { MM, World, bodyHeading, headingQuat, toPhysics } from "./world";
 import type { DeviceInfo } from "../runtime/bridge";
+import { Bumper, Distance, Eye, Mounting, type EyeColor, type FloorReader } from "./devices";
+import { Magnet, Pen, type DrawSurface } from "./tools";
 
 /** Speed at 100% velocity. */
 const MAX_DRIVE_MM_S = 500;
@@ -93,7 +95,10 @@ export class Drivetrain {
   private resolvePending() {
     const p = this.pending;
     this.pending = null;
-    p?.();
+    if (p) {
+      p();
+      this.world.settled++;
+    }
   }
 
   private start(motion: Motion): Promise<void> {
@@ -201,15 +206,33 @@ export interface RobotStart {
   heading: number;
 }
 
-/** The standard VR Robot. Sensors are added in later milestones. */
+export interface RobotOptions {
+  /** The painted floor, for down-facing eye sensors and the pen. */
+  floor?: () => (FloorReader & DrawSurface) | null;
+  /** Playground override for what the eye reads at a spot (hidden art). */
+  colorAt?: (x: number, y: number) => EyeColor | null;
+  /** The pen drew on the floor (repaint it). */
+  onDraw?: () => void;
+}
+
+/** Sensor states that fire events when they change. */
+type Watch = { event: string; on: string; off: string; read: () => boolean; last: boolean };
+
+/** The standard VR Robot: drivetrain, bumpers, eyes, distance, pen, magnet. */
 export class Robot {
   readonly body: RAPIER.RigidBody;
   readonly drivetrain: Drivetrain;
+  readonly pen: Pen;
+  readonly magnet: Magnet;
   readonly devices = new Map<string, { kind: string; api: unknown }>();
+  /** Set by the runner to receive sensor events like "left_bumper.pressed". */
+  onEvent: ((event: string) => void) | null = null;
+  private watches: Watch[] = [];
 
   constructor(
     readonly world: World,
     start: RobotStart,
+    opts: RobotOptions = {},
   ) {
     const { h, radius } = ROBOT_SIZE;
     const p = toPhysics(start.x, start.y, h / 2 + 1);
@@ -227,22 +250,68 @@ export class Robot {
       .setDensity(1500);
     world.physics.createCollider(col, this.body);
 
+    const mount = new Mounting(world, this.body, h / 2);
+    const floor = opts.floor ?? (() => null);
     this.drivetrain = new Drivetrain(world, this.body);
-    this.devices.set("drivetrain", { kind: "Drivetrain", api: this.drivetrain });
-    this.devices.set("location", {
-      kind: "Location",
-      api: {
-        x: () => this.position.x,
-        y: () => this.position.y,
-        angle: () => this.heading,
-      },
+    this.pen = new Pen(mount, floor, opts.onDraw ?? (() => {}));
+    this.magnet = new Magnet(world, mount);
+    const leftBumper = new Bumper(mount, -1, radius);
+    const rightBumper = new Bumper(mount, 1, radius);
+    const frontEye = new Eye(mount, { x: 0, y: radius, z: 30 }, "front", floor);
+    const downEye = new Eye(mount, { x: 0, y: 60, z: 5 }, "down", floor, opts.colorAt);
+    const frontDistance = new Distance(mount, { x: 0, y: radius, z: 50 }, false);
+    const downDistance = new Distance(mount, { x: 0, y: 60, z: 5 }, true);
+
+    const add = (name: string, kind: string, api: unknown) => this.devices.set(name, { kind, api });
+    add("drivetrain", "Drivetrain", this.drivetrain);
+    add("location", "Location", {
+      x: () => this.position.x,
+      y: () => this.position.y,
+      angle: () => this.heading,
     });
-    world.onStep((dt) => this.drivetrain.update(dt));
-    world.onAfterStep(() => this.drivetrain.afterStep());
+    add("left_bumper", "Bumper", leftBumper);
+    add("right_bumper", "Bumper", rightBumper);
+    add("front_eye", "EyeSensor", frontEye);
+    add("down_eye", "EyeSensor", downEye);
+    add("front_distance", "Distance", frontDistance);
+    add("down_distance", "Distance", downDistance);
+    add("pen", "Pen", this.pen);
+    add("magnet", "Electromagnet", this.magnet);
+
+    const watch = (event: string, on: string, off: string, read: () => boolean) =>
+      this.watches.push({ event, on, off, read, last: read() });
+    watch("left_bumper", "pressed", "released", () => leftBumper.pressed());
+    watch("right_bumper", "pressed", "released", () => rightBumper.pressed());
+    watch("front_eye", "object_detected", "object_lost", () => frontEye.near_object());
+    watch("down_eye", "object_detected", "object_lost", () => downEye.near_object());
+
+    world.onStep((dt) => {
+      this.drivetrain.update(dt);
+      this.magnet.update();
+    });
+    world.onAfterStep(() => {
+      this.drivetrain.afterStep();
+      this.pen.update();
+      this.checkEvents();
+    });
+  }
+
+  private checkEvents() {
+    if (!this.onEvent) return;
+    for (const w of this.watches) {
+      const now = w.read();
+      if (now !== w.last) this.onEvent(`${w.event}.${now ? w.on : w.off}`);
+      w.last = now;
+    }
   }
 
   deviceList(): DeviceInfo[] {
     return [...this.devices].map(([name, d]) => ({ name, kind: d.kind }));
+  }
+
+  /** A device's Python-facing object, e.g. device<Eye>("front_eye"). */
+  device<T>(name: string) {
+    return this.devices.get(name)?.api as T;
   }
 
   get position() {

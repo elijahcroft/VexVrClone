@@ -30,6 +30,25 @@ const API = [
   "drivetrain.rotation(DEGREES)",
   "drivetrain.is_done()",
   "drivetrain.is_moving()",
+  "left_bumper.pressed()",
+  "right_bumper.pressed()",
+  "front_eye.near_object()",
+  "front_eye.detect(RED)",
+  "front_eye.brightness(PERCENT)",
+  "down_eye.near_object()",
+  "down_eye.detect(RED)",
+  "down_eye.brightness(PERCENT)",
+  "front_distance.found_object()",
+  "front_distance.get_distance(MM)",
+  "down_distance.get_distance(MM)",
+  "pen.move(DOWN)",
+  "pen.move(UP)",
+  "pen.set_pen_color(RED)",
+  "pen.set_pen_width(THIN)",
+  "pen.set_pen_color_rgb(255, 0, 0, 100)",
+  "pen.fill(255, 0, 0, 100)",
+  "magnet.energize(BOOST)",
+  "magnet.energize(DROP)",
   "location.position(X, MM)",
   "location.position_angle(DEGREES)",
   "brain.print()",
@@ -43,7 +62,8 @@ const API = [
   "stop_project()",
   "Event()",
 ];
-const CONSTANTS = "FORWARD REVERSE LEFT RIGHT MM INCHES DEGREES PERCENT SECONDS MSEC X Y RED GREEN BLUE BLACK".split(" ");
+const CONSTANTS =
+  "FORWARD REVERSE LEFT RIGHT MM INCHES DEGREES PERCENT SECONDS MSEC X Y UP DOWN BOOST DROP RED GREEN BLUE BLACK NONE EXTRA_THIN THIN MEDIUM WIDE EXTRA_WIDE".split(" ");
 
 const completions = completeFromList([
   ...API.map((label) => ({ label, type: "function", apply: label })),

@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import type { SimSession } from "../sim/session";
+import { TABLE_HEIGHT, type SimSession } from "../sim/session";
 import { MM, type SimObject } from "../sim/world";
 import { buildRobotModel } from "./robotModel";
 
@@ -65,14 +65,16 @@ export class SceneView {
     this.meshes = [];
     const { w, h } = session.def.size;
 
-    // Table under the field, then the painted field itself.
-    const table = new THREE.Mesh(
-      new THREE.BoxGeometry((w + 600) * MM, 0.04, (h + 600) * MM),
-      new THREE.MeshStandardMaterial({ color: 0xb9c2cd, roughness: 0.9 }),
+    // Ground under the field (far below it for a raised table), then the
+    // painted field itself.
+    const raised = session.def.raised;
+    const ground = new THREE.Mesh(
+      new THREE.BoxGeometry((w + (raised ? 4000 : 600)) * MM, 0.04, (h + (raised ? 4000 : 600)) * MM),
+      new THREE.MeshStandardMaterial({ color: raised ? 0x7d9a6a : 0xb9c2cd, roughness: 0.9 }),
     );
-    table.position.y = -0.021;
-    table.receiveShadow = true;
-    this.levelGroup.add(table);
+    ground.position.y = raised ? -TABLE_HEIGHT * MM - 0.021 : -0.021;
+    ground.receiveShadow = true;
+    this.levelGroup.add(ground);
 
     this.floorTexture?.dispose();
     this.floorTexture = new THREE.CanvasTexture(session.floor.canvas);
@@ -136,8 +138,17 @@ export class SceneView {
     return this.mode;
   }
 
+  private lastFloorUpload = 0;
+
   render() {
     if (!this.session || !this.robot) return;
+    // Pen strokes: re-upload the floor texture, at most ~12 times a second.
+    const now = performance.now();
+    if (this.session.floorDirty && now - this.lastFloorUpload > 80) {
+      this.session.floorDirty = false;
+      this.lastFloorUpload = now;
+      this.floorChanged();
+    }
     for (const { obj, mesh } of this.meshes) {
       mesh.visible = !obj.removed;
       const t = obj.body.translation();

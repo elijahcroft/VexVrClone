@@ -55,6 +55,7 @@ export function setupPlaygroundWindow(opts: {
   }
 
   const timerEl = $("pw-timer");
+  const statusEl = $("pw-status");
   const fmt = (n: number, digits = 0) => n.toFixed(digits);
   /** Heading for display: 359.97 shows as 0.0, not 360.0. */
   const deg = (n: number) => `${((Math.round(n * 10) / 10) % 360).toFixed(1)}°`;
@@ -63,6 +64,9 @@ export function setupPlaygroundWindow(opts: {
   function update() {
     showCamera(opts.view.cameraMode);
     timerEl.textContent = `${opts.timer().toFixed(1)} s`;
+    const status = opts.session().status();
+    statusEl.hidden = !status;
+    if (status && statusEl.textContent !== status) statusEl.textContent = status;
     if (dashboard.hidden) return;
     const robot = opts.session().robot;
     const dt = robot.drivetrain;
@@ -79,9 +83,27 @@ export function setupPlaygroundWindow(opts: {
       ["Y", `${fmt(p.y)} mm`],
       ["Angle", deg(robot.heading)],
     ];
+    type Api = Record<string, () => unknown>;
+    const dev = (name: string) => robot.device<Api>(name);
+    const yes = (v: unknown) => (v ? "yes" : "no");
+    const sensors: [string, string][] = [
+      ["Left bumper", dev("left_bumper").pressed() ? "pressed" : "released"],
+      ["Right bumper", dev("right_bumper").pressed() ? "pressed" : "released"],
+    ];
+    for (const eye of ["front_eye", "down_eye"]) {
+      const e = dev(eye);
+      const label = eye === "front_eye" ? "Front eye" : "Down eye";
+      sensors.push([label, `${yes(e.near_object())} · ${String(e.color()).toLowerCase()} · ${e.brightness()}%`]);
+    }
+    for (const d of ["front_distance", "down_distance"]) {
+      const s = dev(d);
+      const label = d === "front_distance" ? "Front distance" : "Down distance";
+      sensors.push([label, s.found_object() ? `${s.get_distance()} mm` : "none"]);
+    }
+    sensors.push(["Magnet", robot.magnet.holding ? "holding disk" : "empty"]);
     const section = (name: string, list: [string, string][]) =>
       `<h4>${name}</h4>` + list.map(([k, v]) => `<div class="row"><span>${k}</span><b>${v}</b></div>`).join("");
-    dashboard.innerHTML = section("Drivetrain", rows) + section("Location", location);
+    dashboard.innerHTML = section("Drivetrain", rows) + section("Location", location) + section("Sensors", sensors);
   }
 
   return { update, setOpen, setTitle: (name: string) => ($("pw-name").textContent = name) };

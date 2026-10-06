@@ -7,7 +7,9 @@ import { Order, type PythonGenerator } from "blockly/python";
  */
 
 export const COLORS = {
+  lists: "#ff661a",
   drivetrain: "#4c97ff",
+  magnet: "#cf63cf",
   looks: "#9966ff",
   events: "#ffbf00",
   control: "#ffab19",
@@ -39,6 +41,24 @@ interface BlockSpec {
 const dropdown = (name: string, options: [string, string][]) => ({ type: "field_dropdown", name, options });
 const value = (name: string, check?: string | string[]) => ({ type: "input_value", name, check });
 const statements = (name: string) => ({ type: "input_statement", name });
+const BUMPERS: [string, string][] = [
+  ["left bumper", "left_bumper"],
+  ["right bumper", "right_bumper"],
+];
+const EYES: [string, string][] = [
+  ["front eye", "front_eye"],
+  ["down eye", "down_eye"],
+];
+const DISTANCES: [string, string][] = [
+  ["front distance", "front_distance"],
+  ["down distance", "down_distance"],
+];
+const EYE_COLORS: [string, string][] = [
+  ["red", "RED"],
+  ["green", "GREEN"],
+  ["blue", "BLUE"],
+  ["none", "NONE"],
+];
 const WAIT_OPTIONS: [string, string][] = [
   ["▸", "WAIT"],
   ["and don't wait", "NOWAIT"],
@@ -64,6 +84,17 @@ const bool = (b: Blockly.Block, g: PythonGenerator, name: string, order = Order.
   g.valueToCode(b, name, order) || "False";
 const body = (b: Blockly.Block, g: PythonGenerator, name: string) => g.statementToCode(b, name) || g.INDENT + "pass\n";
 const field = (b: Blockly.Block, name: string) => b.getFieldValue(name) as string;
+const listField = { type: "field_variable", name: "LIST", variable: "my list", variableTypes: ["List"], defaultType: "List" };
+/** A list variable's Python name; also makes sure it starts as []. */
+const list = (b: Blockly.Block, g: PythonGenerator) => {
+  const name = g.getVariableName(field(b, "LIST"));
+  extraDefs.set(`list ${name}`, `${name} = []`);
+  return name;
+};
+const index = (b: Blockly.Block, g: PythonGenerator, name: string) => {
+  const i = num(b, g, name);
+  return /^\d+$/.test(i) ? String(Number(i) - 1) : `int(${i}) - 1`;
+};
 const waitArg = (b: Blockly.Block) => (field(b, "WAIT") === "NOWAIT" ? ", wait=False" : "");
 
 /** Python identifier from a message name. */
@@ -225,6 +256,67 @@ const SPECS: BlockSpec[] = [
     statement: true,
     python: (b) => `brain.set_print_color(${field(b, "COLOR")})\n`,
   },
+  {
+    type: "vr_pen_move",
+    message0: "move pen %1",
+    args0: [dropdown("ACTION", [["down", "DOWN"], ["up", "UP"]])],
+    colour: COLORS.looks,
+    statement: true,
+    python: (b) => `pen.move(${field(b, "ACTION")})\n`,
+  },
+  {
+    type: "vr_pen_color",
+    message0: "set pen to color %1",
+    args0: [dropdown("COLOR", [["black", "BLACK"], ["red", "RED"], ["green", "GREEN"], ["blue", "BLUE"]])],
+    colour: COLORS.looks,
+    statement: true,
+    python: (b) => `pen.set_pen_color(${field(b, "COLOR")})\n`,
+  },
+  {
+    type: "vr_pen_width",
+    message0: "set pen width to %1",
+    args0: [
+      dropdown("WIDTH", [
+        ["extra thin", "EXTRA_THIN"],
+        ["thin", "THIN"],
+        ["medium", "MEDIUM"],
+        ["wide", "WIDE"],
+        ["extra wide", "EXTRA_WIDE"],
+      ]),
+    ],
+    colour: COLORS.looks,
+    statement: true,
+    python: (b) => `pen.set_pen_width(${field(b, "WIDTH")})\n`,
+  },
+  {
+    type: "vr_pen_color_rgb",
+    message0: "set pen color red %1 green %2 blue %3 opacity %4 %%",
+    args0: [value("R", "Number"), value("G", "Number"), value("B", "Number"), value("A", "Number")],
+    colour: COLORS.looks,
+    statement: true,
+    inputsInline: true,
+    python: (b, g) =>
+      `pen.set_pen_color_rgb(${num(b, g, "R")}, ${num(b, g, "G")}, ${num(b, g, "B")}, ${num(b, g, "A")})\n`,
+  },
+  {
+    type: "vr_pen_fill",
+    message0: "fill area with color red %1 green %2 blue %3 opacity %4 %%",
+    args0: [value("R", "Number"), value("G", "Number"), value("B", "Number"), value("A", "Number")],
+    colour: COLORS.looks,
+    statement: true,
+    inputsInline: true,
+    python: (b, g) => `pen.fill(${num(b, g, "R")}, ${num(b, g, "G")}, ${num(b, g, "B")}, ${num(b, g, "A")})\n`,
+  },
+
+  // -------------------------------------------------------------- magnet
+  {
+    type: "vr_magnet",
+    message0: "energize magnet to %1",
+    args0: [dropdown("ACTION", [["boost", "BOOST"], ["drop", "DROP"]])],
+    colour: COLORS.magnet,
+    statement: true,
+    python: (b) => `magnet.energize(${field(b, "ACTION")})\n`,
+  },
 
   // -------------------------------------------------------------- events
   {
@@ -235,6 +327,49 @@ const SPECS: BlockSpec[] = [
     python: (b, g) => {
       const { name, code } = hatFunction(b, g, "when_started");
       registrations.push(`vr_thread(${name})`);
+      return code;
+    },
+  },
+  {
+    type: "vr_when_bumper",
+    message0: "when %1 %2",
+    args0: [dropdown("DEVICE", BUMPERS), dropdown("EVENT", [["pressed", "pressed"], ["released", "released"]])],
+    colour: COLORS.events,
+    hat: true,
+    python: (b, g) => {
+      const device = field(b, "DEVICE");
+      const event = field(b, "EVENT");
+      const { name, code } = hatFunction(b, g, `onevent_${device}_${event}`);
+      registrations.push(`${device}.${event}(${name})`);
+      return code;
+    },
+  },
+  {
+    type: "vr_when_eye",
+    message0: "when %1 %2",
+    args0: [
+      dropdown("DEVICE", EYES),
+      dropdown("EVENT", [["detects an object", "object_detected"], ["loses an object", "object_lost"]]),
+    ],
+    colour: COLORS.events,
+    hat: true,
+    python: (b, g) => {
+      const device = field(b, "DEVICE");
+      const event = field(b, "EVENT");
+      const { name, code } = hatFunction(b, g, `onevent_${device}_${event}`);
+      registrations.push(`${device}.${event}(${name})`);
+      return code;
+    },
+  },
+  {
+    type: "vr_when_timer",
+    message0: "when timer > %1 seconds",
+    args0: [{ type: "field_number", name: "TIME", value: 1, min: 0 }],
+    colour: COLORS.events,
+    hat: true,
+    python: (b, g) => {
+      const { name, code } = hatFunction(b, g, "onevent_timer");
+      registrations.push(`brain.timer_event(${name}, ${Math.round(Number(field(b, "TIME")) * 1000)})`);
       return code;
     },
   },
@@ -418,6 +553,54 @@ const SPECS: BlockSpec[] = [
     python: () => ["drivetrain.rotation(DEGREES)", Order.FUNCTION_CALL],
   },
   {
+    type: "vr_bumper_pressed",
+    message0: "%1 pressed?",
+    args0: [dropdown("DEVICE", BUMPERS)],
+    colour: COLORS.sensing,
+    output: "Boolean",
+    python: (b) => [`${field(b, "DEVICE")}.pressed()`, Order.FUNCTION_CALL],
+  },
+  {
+    type: "vr_eye_near",
+    message0: "%1 is near object?",
+    args0: [dropdown("DEVICE", EYES)],
+    colour: COLORS.sensing,
+    output: "Boolean",
+    python: (b) => [`${field(b, "DEVICE")}.near_object()`, Order.FUNCTION_CALL],
+  },
+  {
+    type: "vr_eye_detects",
+    message0: "%1 detects %2 ?",
+    args0: [dropdown("DEVICE", EYES), dropdown("COLOR", EYE_COLORS)],
+    colour: COLORS.sensing,
+    output: "Boolean",
+    python: (b) => [`${field(b, "DEVICE")}.detect(${field(b, "COLOR")})`, Order.FUNCTION_CALL],
+  },
+  {
+    type: "vr_eye_brightness",
+    message0: "%1 brightness in %%",
+    args0: [dropdown("DEVICE", EYES)],
+    colour: COLORS.sensing,
+    output: "Number",
+    python: (b) => [`${field(b, "DEVICE")}.brightness(PERCENT)`, Order.FUNCTION_CALL],
+  },
+  {
+    type: "vr_distance_found",
+    message0: "%1 found an object?",
+    args0: [dropdown("DEVICE", DISTANCES)],
+    colour: COLORS.sensing,
+    output: "Boolean",
+    python: (b) => [`${field(b, "DEVICE")}.found_object()`, Order.FUNCTION_CALL],
+  },
+  {
+    type: "vr_distance",
+    message0: "%1 distance in %2",
+    args0: [dropdown("DEVICE", DISTANCES), dropdown("UNITS", [["mm", "MM"], ["inches", "INCHES"]])],
+    colour: COLORS.sensing,
+    output: "Number",
+    python: (b) => [`${field(b, "DEVICE")}.get_distance(${field(b, "UNITS")})`, Order.FUNCTION_CALL],
+  },
+  {
     type: "vr_position",
     message0: "position %1 in %2",
     args0: [dropdown("AXIS", [["X", "X"], ["Y", "Y"]]), dropdown("UNITS", [["mm", "MM"], ["inches", "INCHES"]])],
@@ -431,6 +614,124 @@ const SPECS: BlockSpec[] = [
     colour: COLORS.sensing,
     output: "Number",
     python: () => ["location.position_angle(DEGREES)", Order.FUNCTION_CALL],
+  },
+
+  // --------------------------------------------------------------- lists
+  {
+    type: "vr_list_add",
+    message0: "add %1 to %2",
+    args0: [value("ITEM"), listField],
+    colour: COLORS.lists,
+    statement: true,
+    inputsInline: true,
+    python: (b, g) => `${list(b, g)}.append(${str(b, g, "ITEM")})\n`,
+  },
+  {
+    type: "vr_list_delete",
+    message0: "delete %1 of %2",
+    args0: [value("INDEX", "Number"), listField],
+    colour: COLORS.lists,
+    statement: true,
+    inputsInline: true,
+    python: (b, g) => `del ${list(b, g)}[${index(b, g, "INDEX")}]\n`,
+  },
+  {
+    type: "vr_list_clear",
+    message0: "delete all of %1",
+    args0: [listField],
+    colour: COLORS.lists,
+    statement: true,
+    python: (b, g) => `${list(b, g)}.clear()\n`,
+  },
+  {
+    type: "vr_list_insert",
+    message0: "insert %1 at %2 of %3",
+    args0: [value("ITEM"), value("INDEX", "Number"), listField],
+    colour: COLORS.lists,
+    statement: true,
+    inputsInline: true,
+    python: (b, g) => `${list(b, g)}.insert(${index(b, g, "INDEX")}, ${str(b, g, "ITEM")})\n`,
+  },
+  {
+    type: "vr_list_replace",
+    message0: "replace item %1 of %2 with %3",
+    args0: [value("INDEX", "Number"), listField, value("ITEM")],
+    colour: COLORS.lists,
+    statement: true,
+    inputsInline: true,
+    python: (b, g) => `${list(b, g)}[${index(b, g, "INDEX")}] = ${str(b, g, "ITEM")}\n`,
+  },
+  {
+    type: "vr_list_replace_2d",
+    message0: "replace item row %1 column %2 of %3 with %4",
+    args0: [value("ROW", "Number"), value("COL", "Number"), listField, value("ITEM")],
+    colour: COLORS.lists,
+    statement: true,
+    inputsInline: true,
+    python: (b, g) => `${list(b, g)}[${index(b, g, "ROW")}][${index(b, g, "COL")}] = ${str(b, g, "ITEM")}\n`,
+  },
+  {
+    type: "vr_list_get",
+    message0: "%1",
+    args0: [listField],
+    colour: COLORS.lists,
+    output: "Array",
+    python: (b, g) => [list(b, g), Order.ATOMIC],
+  },
+  {
+    type: "vr_list_empty",
+    message0: "empty list",
+    colour: COLORS.lists,
+    output: "Array",
+    python: () => ["[]", Order.ATOMIC],
+  },
+  {
+    type: "vr_list_item",
+    message0: "item %1 of %2",
+    args0: [value("INDEX", "Number"), listField],
+    colour: COLORS.lists,
+    output: null,
+    inputsInline: true,
+    python: (b, g) => [`${list(b, g)}[${index(b, g, "INDEX")}]`, Order.MEMBER],
+  },
+  {
+    type: "vr_list_item_2d",
+    message0: "item row %1 column %2 of %3",
+    args0: [value("ROW", "Number"), value("COL", "Number"), listField],
+    colour: COLORS.lists,
+    output: null,
+    inputsInline: true,
+    python: (b, g) => [`${list(b, g)}[${index(b, g, "ROW")}][${index(b, g, "COL")}]`, Order.MEMBER],
+  },
+  {
+    type: "vr_list_index_of",
+    message0: "item # of %1 in %2",
+    args0: [value("ITEM"), listField],
+    colour: COLORS.lists,
+    output: "Number",
+    inputsInline: true,
+    python: (b, g) => {
+      const l = list(b, g);
+      const item = str(b, g, "ITEM");
+      return [`(${l}.index(${item}) + 1 if ${item} in ${l} else 0)`, Order.CONDITIONAL];
+    },
+  },
+  {
+    type: "vr_list_length",
+    message0: "length of %1",
+    args0: [listField],
+    colour: COLORS.lists,
+    output: "Number",
+    python: (b, g) => [`len(${list(b, g)})`, Order.FUNCTION_CALL],
+  },
+  {
+    type: "vr_list_contains",
+    message0: "%1 contains %2 ?",
+    args0: [listField, value("ITEM")],
+    colour: COLORS.lists,
+    output: "Boolean",
+    inputsInline: true,
+    python: (b, g) => [`${str(b, g, "ITEM")} in ${list(b, g)}`, Order.RELATIONAL],
   },
 
   // ----------------------------------------------------------- operators

@@ -1,6 +1,6 @@
 import type { PyodideAPI } from "pyodide";
 import type { SimSession } from "../sim/session";
-import { installRuntime, runProgram, stopProgram, type VrBridge } from "./bridge";
+import { dispatchEvent, installRuntime, monitorValues, runProgram, stopProgram, type VrBridge } from "./bridge";
 
 export interface ConsoleSink {
   print(text: string): void;
@@ -35,9 +35,14 @@ function makeYield() {
 export class Runner {
   private py: Promise<PyodideAPI> | null = null;
   private running = false;
+  /** Number of runs started (lets tests wait for a run to finish). */
+  runCount = 0;
   private stepping = false;
   private stepWaiters: (() => void)[] = [];
   private timerStart = 0;
+  private loaded: PyodideAPI | null = null;
+  /** monitor_variable / monitor_sensor names for the current program. */
+  readonly monitored: { kind: "variable" | "sensor"; name: string }[] = [];
   /** Timer value shown while no program is running. */
   private frozenTimer = 0;
 
@@ -50,6 +55,7 @@ export class Runner {
         const { loadPyodide } = await import("pyodide");
         const py = await loadPyodide({ indexURL: new URL("pyodide/", document.baseURI).href });
         installRuntime(py, this.bridge());
+        this.loaded = py;
         return py;
       })();
     }
@@ -80,12 +86,17 @@ export class Runner {
     }
     const py = await this.load();
     this.running = true;
+    this.runCount++;
     this.stepping = step;
+    this.monitored.length = 0;
     this.timerStart = this.host.session().world.time;
     this.host.onRunningChange(true);
+    const robot = this.host.session().robot;
+    robot.onEvent = (event) => dispatchEvent(py, event);
     try {
       await runProgram(py, source);
     } finally {
+      robot.onEvent = null;
       this.frozenTimer = this.timer();
       this.running = false;
       this.stepping = false;
@@ -99,6 +110,34 @@ export class Runner {
   async stop() {
     if (!this.running) return;
     stopProgram(await this.load());
+  }
+
+  /** [name, value] rows for the Monitor panel. */
+  monitorRows(): [string, string][] {
+    const vars = this.monitored.filter((m) => m.kind === "variable").map((m) => m.name);
+    const varValues = this.loaded && vars.length ? monitorValues(this.loaded, vars) : [];
+    let v = 0;
+    return this.monitored.map((m) =>
+      m.kind === "variable" ? [m.name, varValues[v++] ?? ""] : [m.name, this.readSensor(m.name)],
+    );
+  }
+
+  /** A sensor reading by VEX-style name, e.g. "front_eye.brightness". */
+  private readSensor(name: string): string {
+    if (name === "brain.timer" || name === "brain.timer_time") return this.timer().toFixed(2);
+    const [device, prop = ""] = name.split(".");
+    const robot = this.host.session().robot;
+    if (device === "location") {
+      const p = robot.position;
+      return prop.includes("angle") ? robot.heading.toFixed(1) : `${p.x.toFixed(0)}, ${p.y.toFixed(0)}`;
+    }
+    const api = robot.device<Record<string, unknown>>(device);
+    if (!api) return "?";
+    const aliases: Record<string, string> = { distance: "get_distance", color: "color" };
+    const fn = api[aliases[prop] ?? prop];
+    if (typeof fn !== "function") return "?";
+    const value = (fn as () => unknown).call(api);
+    return typeof value === "number" ? String(Math.round(value * 100) / 100) : String(value);
   }
 
   /** Step: start in step mode, or let the next block run. */
@@ -145,6 +184,9 @@ export class Runner {
         host.session().robot.drivetrain.stop();
         world().releaseWaiters();
         this.releaseSteps();
+      },
+      monitor_add: (kind, name) => {
+        if (!this.monitored.some((m) => m.kind === kind && m.name === name)) this.monitored.push({ kind, name });
       },
       device_list: () => host.session().robot.deviceList(),
       device: (name) => host.session().robot.devices.get(name)?.api,

@@ -43,7 +43,19 @@ const TOOLBOX = {
         block("vr_clear_rows"),
         block("vr_print_precision"),
         block("vr_print_color"),
+        label("Pen"),
+        block("vr_pen_move"),
+        block("vr_pen_color"),
+        block("vr_pen_width"),
+        block("vr_pen_color_rgb", { R: number(255), G: number(0), B: number(0), A: number(100) }),
+        block("vr_pen_fill", { R: number(255), G: number(0), B: number(0), A: number(100) }),
       ],
+    },
+    {
+      kind: "category",
+      name: "Magnet",
+      colour: COLORS.magnet,
+      contents: [block("vr_magnet")],
     },
     {
       kind: "category",
@@ -51,6 +63,9 @@ const TOOLBOX = {
       colour: COLORS.events,
       contents: [
         block("vr_when_started"),
+        block("vr_when_bumper"),
+        block("vr_when_eye"),
+        block("vr_when_timer"),
         block("vr_when_i_receive"),
         block("vr_broadcast"),
         block("vr_broadcast_wait"),
@@ -86,6 +101,15 @@ const TOOLBOX = {
         block("vr_drive_is_moving"),
         block("vr_drive_heading"),
         block("vr_drive_rotation"),
+        label("Bumpers"),
+        block("vr_bumper_pressed"),
+        label("Eye sensors"),
+        block("vr_eye_near"),
+        block("vr_eye_detects"),
+        block("vr_eye_brightness"),
+        label("Distance sensors"),
+        block("vr_distance_found"),
+        block("vr_distance"),
         label("Location"),
         block("vr_position"),
         block("vr_position_angle"),
@@ -133,7 +157,7 @@ const theme = Blockly.Theme.defineTheme("robocode", {
   fontStyle: { family: "system-ui, sans-serif", weight: "600", size: 11 },
 });
 
-/** Variables flyout with number shadows already in place, Scratch-style. */
+/** Variables and lists flyout with number shadows in place, Scratch-style. */
 function variablesFlyout(ws: Blockly.WorkspaceSvg) {
   const items: object[] = [{ kind: "button", text: "Make a Variable", callbackkey: "VR_CREATE_VARIABLE" }];
   const vars = ws.getVariableMap().getVariablesOfType("");
@@ -142,6 +166,29 @@ function variablesFlyout(ws: Blockly.WorkspaceSvg) {
     items.push({ kind: "block", type: "variables_set", fields: first, inputs: { VALUE: number(0) } });
     items.push({ kind: "block", type: "math_change", fields: first, inputs: { DELTA: number(1) } });
     for (const v of vars) items.push({ kind: "block", type: "variables_get", fields: { VAR: { id: v.getId() } } });
+  }
+  items.push({ kind: "button", text: "Make a List", callbackkey: "VR_CREATE_LIST" });
+  const lists = ws.getVariableMap().getVariablesOfType("List");
+  if (lists.length) {
+    const l = { LIST: { id: lists[0].getId() } };
+    const one = number(1);
+    const block = (type: string, inputs: Record<string, unknown> = {}) => ({ kind: "block", type, fields: l, inputs });
+    items.push(
+      ...lists.map((v) => ({ kind: "block", type: "vr_list_get", fields: { LIST: { id: v.getId() } } })),
+      block("vr_list_add", { ITEM: text("thing") }),
+      block("vr_list_delete", { INDEX: one }),
+      block("vr_list_clear"),
+      block("vr_list_insert", { ITEM: text("thing"), INDEX: one }),
+      block("vr_list_replace", { INDEX: one, ITEM: text("thing") }),
+      block("vr_list_item", { INDEX: one }),
+      block("vr_list_index_of", { ITEM: text("thing") }),
+      block("vr_list_length"),
+      block("vr_list_contains", { ITEM: text("thing") }),
+      { kind: "label", text: "2D lists" },
+      { kind: "block", type: "vr_list_empty" },
+      block("vr_list_item_2d", { ROW: one, COL: one }),
+      block("vr_list_replace_2d", { ROW: one, COL: one, ITEM: text("thing") }),
+    );
   }
   return items as Blockly.utils.toolbox.FlyoutItemInfoArray;
 }
@@ -163,6 +210,9 @@ export function createBlocksEditor(container: HTMLElement) {
   ws.registerToolboxCategoryCallback("VR_VARIABLES", variablesFlyout);
   ws.registerButtonCallback("VR_CREATE_VARIABLE", (button) =>
     Blockly.Variables.createVariableButtonHandler(button.getTargetWorkspace()),
+  );
+  ws.registerButtonCallback("VR_CREATE_LIST", (button) =>
+    Blockly.Variables.createVariableButtonHandler(button.getTargetWorkspace(), undefined, "List"),
   );
   return ws;
 }

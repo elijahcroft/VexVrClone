@@ -7,6 +7,7 @@ import { getPlayground } from "./playgrounds";
 import { autosave, downloadProject, loadAutosave, parseProject, type Project } from "./project/storage";
 import { SceneView } from "./render/scene";
 import { Runner } from "./runtime/runner";
+import { classifyColor } from "./sim/devices";
 import { SimSession } from "./sim/session";
 import { World } from "./sim/world";
 import { ConsoleView } from "./ui/console";
@@ -97,13 +98,27 @@ async function main() {
   window_.setOpen(true);
   $("toggle-playground").addEventListener("click", () => window_.setOpen(!!$("playground-window").hidden));
 
-  async function reset(playgroundId = state.playground) {
+  const startSelect = $<HTMLSelectElement>("pw-start");
+
+  /** Fresh session; a different playground resets the start choice. */
+  async function reset(playgroundId = state.playground, startIndex = session.startIndex) {
     await runner.stop();
+    if (playgroundId !== state.playground) startIndex = 0;
     state.playground = playgroundId;
-    session = new SimSession(getPlayground(playgroundId));
+    session = new SimSession(getPlayground(playgroundId), startIndex);
     view.load(session);
     window_.setTitle(session.def.name);
+    showStarts();
   }
+
+  function showStarts() {
+    const starts = session.def.starts ?? [];
+    startSelect.hidden = starts.length === 0;
+    startSelect.innerHTML = starts.map((s, i) => `<option value="${i}">${s.label}</option>`).join("");
+    startSelect.value = String(session.startIndex);
+  }
+  startSelect.addEventListener("change", () => void reset(state.playground, Number(startSelect.value)));
+  showStarts();
 
   const picker = setupPicker(
     () => state.playground,
@@ -115,14 +130,17 @@ async function main() {
   );
   $("select-playground").addEventListener("click", () => picker.open());
 
+  // Tests fast-forward the simulation with ?speed=N.
+  const speed = Number(new URLSearchParams(location.search).get("speed")) || 1;
   let last = performance.now();
   function frame(now: number) {
-    session.advance((now - last) / 1000);
+    session.advance((now - last) / 1000, speed);
     last = now;
     if (!$("playground-window").hidden) {
       view.render();
       window_.update();
     }
+    updateMonitor(now);
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
@@ -154,6 +172,28 @@ async function main() {
 
   // ---------------------------------------------------------------- console
   $("console-clear").addEventListener("click", () => consoleView.clear());
+  for (const tab of document.querySelectorAll<HTMLButtonElement>(".tab")) {
+    tab.addEventListener("click", () => {
+      for (const t of document.querySelectorAll<HTMLButtonElement>(".tab")) {
+        t.classList.toggle("active", t === tab);
+        $(t.dataset.tab!).hidden = t !== tab;
+      }
+      $("console-clear").hidden = tab.dataset.tab !== "console-output";
+    });
+  }
+  const monitorTable = $<HTMLTableElement>("monitor-table");
+  let lastMonitor = 0;
+  function updateMonitor(now: number) {
+    if ($("monitor-output").hidden || now - lastMonitor < 250) return;
+    lastMonitor = now;
+    const rows = runner.monitorRows();
+    monitorTable.textContent = "";
+    for (const [name, value] of rows) {
+      const tr = monitorTable.insertRow();
+      tr.insertCell().textContent = name;
+      tr.insertCell().textContent = value;
+    }
+  }
   $("console-toggle").addEventListener("click", (e) => {
     const panel = $("console-panel");
     panel.classList.toggle("collapsed");
@@ -231,7 +271,14 @@ async function main() {
   });
 
   // Handle for automated tests.
-  Object.assign(window, { rcsim: { runner, session: () => session, view } });
+  Object.assign(window, {
+    rcsim: {
+      runner,
+      session: () => session,
+      view,
+      floorColor: (x: number, y: number) => classifyColor(session.floor.sample(x, y) ?? [0, 0, 0]),
+    },
+  });
 
   const saved = loadAutosave();
   applyProject(saved ?? { format: "robocode-sim", version: 1, name: "Untitled Project", mode: "blocks", playground: state.playground });

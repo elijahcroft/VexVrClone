@@ -1,0 +1,6 @@
+{"format":"robocode-sim","version":1,"name":"Bumper","mode":"blocks","playground":"grid-map",
+ "blocks":{"blocks":{"languageVersion":0,"blocks":[
+  {"type":"vr_when_started","x":40,"y":40,"next":{"block":{"type":"vr_drive","fields":{"DIR":"FORWARD"}}}},
+  {"type":"vr_when_bumper","x":40,"y":200,"fields":{"DEVICE":"left_bumper","EVENT":"pressed"},"next":{"block":
+   {"type":"vr_stop_driving","next":{"block":{"type":"vr_print","fields":{"NEWLINE":"YES"},"inputs":{"VALUE":{"shadow":{"type":"text","fields":{"TEXT":"bump"}}}},
+    "next":{"block":{"type":"vr_stop_project"}}}}}}}]}}}

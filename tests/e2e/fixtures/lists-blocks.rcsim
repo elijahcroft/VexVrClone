@@ -1,0 +1,8 @@
+{"format":"robocode-sim","version":1,"name":"Lists","mode":"blocks","playground":"grid-map",
+ "blocks":{"blocks":{"languageVersion":0,"blocks":[{"type":"vr_when_started","x":40,"y":40,"next":{"block":
+  {"type":"vr_list_add","fields":{"LIST":{"id":"L1"}},"inputs":{"ITEM":{"shadow":{"type":"text","fields":{"TEXT":"a"}}}},
+   "next":{"block":{"type":"vr_list_add","fields":{"LIST":{"id":"L1"}},"inputs":{"ITEM":{"shadow":{"type":"text","fields":{"TEXT":"b"}}}},
+   "next":{"block":{"type":"vr_list_replace","fields":{"LIST":{"id":"L1"}},"inputs":{"INDEX":{"shadow":{"type":"math_number","fields":{"NUM":1}}},"ITEM":{"shadow":{"type":"text","fields":{"TEXT":"z"}}}},
+   "next":{"block":{"type":"vr_print","fields":{"NEWLINE":"YES"},"inputs":{"VALUE":{"shadow":{"type":"text","fields":{"TEXT":""}},"block":{"type":"vr_list_item","fields":{"LIST":{"id":"L1"}},"inputs":{"INDEX":{"shadow":{"type":"math_number","fields":{"NUM":1}}}}}}},
+   "next":{"block":{"type":"vr_print","fields":{"NEWLINE":"YES"},"inputs":{"VALUE":{"shadow":{"type":"text","fields":{"TEXT":""}},"block":{"type":"vr_list_length","fields":{"LIST":{"id":"L1"}}}}}}}}}}}}}}}}]},
+ "variables":[{"name":"my list","id":"L1","type":"List"}]}}

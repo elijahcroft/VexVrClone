@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { loadPyodide, type PyodideAPI } from "pyodide";
-import { installRuntime, runProgram, stopProgram, type VrBridge } from "../../src/runtime/bridge";
+import { dispatchEvent, installRuntime, runProgram, stopProgram, type VrBridge } from "../../src/runtime/bridge";
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -37,8 +37,12 @@ function mockBridge(moveMs = 5) {
     console_set_color: () => {},
     report_error: (m) => errors.push(m),
     on_program_stopped: () => log.push("program_stopped"),
-    device_list: () => [{ name: "drivetrain", kind: "Drivetrain" }],
-    device: () => drivetrain,
+    monitor_add: () => {},
+    device_list: () => [
+      { name: "drivetrain", kind: "Drivetrain" },
+      { name: "left_bumper", kind: "Bumper" },
+    ],
+    device: (name) => (name === "left_bumper" ? { pressed: () => true } : drivetrain),
   };
   return { bridge, log, output, errors };
 }
@@ -189,6 +193,25 @@ while True:
     stopProgram(py);
     await done;
     expect(current.output).toEqual([]);
+  });
+
+  it("runs event handlers when JS dispatches sensor events", async () => {
+    current = mockBridge();
+    const done = runProgram(py, `
+bumper = Bumper("leftBumper", 2)   # old-style name
+def hit():
+    print("ouch", bumper.pressed())
+left_bumper.pressed(hit)
+`);
+    await sleep(20);
+    dispatchEvent(py, "left_bumper.pressed");
+    await sleep(20);
+    dispatchEvent(py, "left_bumper.pressed");
+    await sleep(20);
+    stopProgram(py); // handlers keep a program alive until Stop
+    await done;
+    expect(current.errors).toEqual([]);
+    expect(current.output).toEqual(["ouch True", "ouch True"]);
   });
 
   it("stop_project() ends the program from inside", async () => {

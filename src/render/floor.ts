@@ -71,6 +71,51 @@ export class FloorPainter {
     c.fillText(str, ...this.px(x, y));
   }
 
+  /**
+   * Paint-bucket fill at a field position: recolors the connected area that
+   * matches the color there (a grid square, a drawn shape, or open floor).
+   */
+  floodFill(x: number, y: number, [r, g, b, a]: [number, number, number, number]) {
+    const W = this.canvas.width;
+    const H = this.canvas.height;
+    const [fx, fy] = this.px(x, y).map(Math.floor);
+    if (fx < 0 || fy < 0 || fx >= W || fy >= H) return;
+    const img = this.ctx.getImageData(0, 0, W, H);
+    const d = img.data;
+    const s = (fy * W + fx) * 4;
+    const seed = [d[s], d[s + 1], d[s + 2]];
+    const matches = (i: number) =>
+      Math.abs(d[i] - seed[0]) + Math.abs(d[i + 1] - seed[1]) + Math.abs(d[i + 2] - seed[2]) < 60;
+    const done = new Uint8Array(W * H);
+    const stack = [fx, fy];
+    while (stack.length) {
+      const py = stack.pop()!;
+      let px = stack.pop()!;
+      while (px > 0 && !done[py * W + px - 1] && matches((py * W + px - 1) * 4)) px--;
+      let above = false;
+      let below = false;
+      for (; px < W; px++) {
+        const k = py * W + px;
+        if (done[k] || !matches(k * 4)) break;
+        done[k] = 1;
+        const i = k * 4;
+        d[i] = d[i] * (1 - a) + r * a;
+        d[i + 1] = d[i + 1] * (1 - a) + g * a;
+        d[i + 2] = d[i + 2] * (1 - a) + b * a;
+        for (const [ny, flag] of [[py - 1, "above"], [py + 1, "below"]] as const) {
+          if (ny < 0 || ny >= H) continue;
+          const nk = ny * W + px;
+          const open = !done[nk] && matches(nk * 4);
+          const seen = flag === "above" ? above : below;
+          if (open && !seen) stack.push(px, ny);
+          if (flag === "above") above = open;
+          else below = open;
+        }
+      }
+    }
+    this.ctx.putImageData(img, 0, 0);
+  }
+
   /** RGB at a field position, or null if off the floor. */
   sample(x: number, y: number): [number, number, number] | null {
     const [px, py] = this.px(x, y);

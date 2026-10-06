@@ -13,20 +13,25 @@ const robot = (page: Page) =>
     return { x: Math.round(p.x), y: Math.round(p.y), heading: Math.round(dt.heading()) % 360, moving: dt.is_moving() };
   });
 
-async function openApp(page: Page) {
+async function openApp(page: Page, url = "/") {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
   page.on("dialog", (d) => d.accept());
-  await page.goto("/");
+  await page.goto(url);
   await expect(page.locator("#python-status")).toBeHidden();
   return errors;
 }
 
+/** Click Start and wait until that run has finished. */
 async function runToEnd(page: Page) {
+  const before = await page.evaluate(() => (window as any).rcsim.runner.runCount);
   await page.click("#btn-start");
-  await expect(page.locator("#btn-stop")).toBeEnabled();
-  await expect(page.locator("#btn-stop")).toBeDisabled();
+  await page.waitForFunction(
+    (n) => (window as any).rcsim.runner.runCount > n && !(window as any).rcsim.runner.isRunning,
+    before,
+    { timeout: 600_000, polling: 200 },
+  );
 }
 
 test("blocks program runs and matches VEX-style Python", async ({ page }) => {
@@ -104,4 +109,24 @@ test("project autosaves and comes back after reload", async ({ page }) => {
   await expect(page.locator("#project-name")).toHaveValue("My saved project");
   await page.click("#code-viewer-tab");
   await expect(page.locator("#code-viewer-text")).toContainText("drivetrain.drive_for(FORWARD, 400, MM)");
+});
+
+test("list blocks generate Python lists", async ({ page }) => {
+  await openApp(page);
+  await page.setInputFiles("#open-file", fixture("lists-blocks.rcsim"));
+  await page.click("#code-viewer-tab");
+  await expect(page.locator("#code-viewer-text")).toContainText("my_list = []");
+  await expect(page.locator("#code-viewer-text")).toContainText("my_list[0] = 'z'");
+  await runToEnd(page);
+  await expect(page.locator("#console-output > div")).toHaveText(["z", "2"]);
+});
+
+test("bumper event hat fires when the robot hits a wall", async ({ page }) => {
+  await openApp(page, "/?speed=8");
+  await page.setInputFiles("#open-file", fixture("bumper-blocks.rcsim"));
+  await page.click("#code-viewer-tab");
+  await expect(page.locator("#code-viewer-text")).toContainText("left_bumper.pressed(onevent_left_bumper_pressed_1)");
+  await runToEnd(page);
+  await expect(page.locator("#console-output")).toHaveText("bump");
+  expect((await robot(page)).y).toBeGreaterThan(850);
 });

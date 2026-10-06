@@ -8,6 +8,7 @@ All distances cross the bridge in mm, angles in degrees, times in seconds.
 """
 
 import asyncio
+import re
 import sys
 import traceback
 
@@ -59,6 +60,7 @@ class _State:
         self.tasks = set()
         self.handlers = {}  # event name -> list of callbacks
         self.stop_future = None
+        self.globals = {}
         self.last_yield = 0.0
         self.error_reported = False
 
@@ -155,6 +157,22 @@ def _vr_dispatch(event):
         return
     for callback, args in _state.handlers.get(event, []):
         _spawn(callback, *args)
+
+
+def monitor_variable(*names):
+    for name in names:
+        vrjs.monitor_add("variable", str(name))
+
+
+def monitor_sensor(*names):
+    for name in names:
+        vrjs.monitor_add("sensor", str(name))
+
+
+def _vr_monitor_values(names):
+    """Current values of monitored global variables, as display strings."""
+    g = _state.globals
+    return [repr(g[n]) if n in g else "(not set)" for n in names]
 
 
 async def wait(duration, units=SECONDS):
@@ -279,6 +297,83 @@ class Drivetrain:
 
 # ---------------------------------------------------------------- sensors
 
+# Older VEXcode templates name devices like Bumper("leftBumper", 2).
+_ALIASES = {"distance": "front_distance"}
+
+
+def _device_name(name):
+    name = re.sub(r"(?<=[a-z])([A-Z])", r"_\1", str(name)).lower()
+    return _ALIASES.get(name, name)
+
+
+class _Device:
+    def __init__(self, name, *_):
+        self._name = _device_name(name)
+        self._d = vrjs.device(self._name)
+
+
+class Bumper(_Device):
+    def pressed(self, callback=None, *args):
+        if callback is None:
+            return self._d.pressed()
+        _on(self._name + ".pressed", callback, *args)
+
+    def on_pressed(self, callback, *args):
+        _on(self._name + ".pressed", callback, *args)
+
+    def released(self, callback, *args):
+        _on(self._name + ".released", callback, *args)
+
+    def on_released(self, callback, *args):
+        _on(self._name + ".released", callback, *args)
+
+
+class EyeSensor(_Device):
+    def near_object(self):
+        return self._d.near_object()
+
+    def detect(self, color):
+        return self._d.detect(str(color))
+
+    def brightness(self, units=PERCENT):
+        return self._d.brightness()
+
+    def object_detected(self, callback, *args):
+        _on(self._name + ".object_detected", callback, *args)
+
+    def object_lost(self, callback, *args):
+        _on(self._name + ".object_lost", callback, *args)
+
+
+class Distance(_Device):
+    def found_object(self):
+        return self._d.found_object()
+
+    def get_distance(self, units=MM):
+        return _from_mm(self._d.get_distance(), units)
+
+
+class Pen(_Device):
+    def move(self, action):
+        self._d.move(str(action))
+
+    def set_pen_color(self, color):
+        self._d.set_pen_color(str(color))
+
+    def set_pen_width(self, width):
+        self._d.set_pen_width(str(width))
+
+    def set_pen_color_rgb(self, red, green, blue, opacity=100):
+        self._d.set_pen_color_rgb(red, green, blue, opacity)
+
+    def fill(self, red, green, blue, opacity=100):
+        self._d.fill(red, green, blue, opacity)
+
+
+class Electromagnet(_Device):
+    def energize(self, action):
+        self._d.energize(str(action))
+
 
 class Location:
     def __init__(self, name="location", *_):
@@ -314,7 +409,16 @@ class Event:
 
 # --------------------------------------------------------------- runner
 
-_CLASSES = {"Drivetrain": Drivetrain, "Brain": Brain, "Location": Location}
+_CLASSES = {
+    "Drivetrain": Drivetrain,
+    "Brain": Brain,
+    "Location": Location,
+    "Bumper": Bumper,
+    "EyeSensor": EyeSensor,
+    "Distance": Distance,
+    "Pen": Pen,
+    "Electromagnet": Electromagnet,
+}
 
 
 def _print(*values, sep=" ", end="\n", **_):
@@ -340,6 +444,8 @@ def _make_globals():
         if cls is not None:
             g[device.name] = cls(device.name)
     g["brain"] = Brain()
+    if "front_distance" in g:
+        g["distance"] = g["front_distance"]
     return g
 
 
@@ -362,6 +468,7 @@ async def run_program(source):
         return
 
     g = _make_globals()
+    _state.globals = g
 
     async def top_level():
         result = eval(code, g)

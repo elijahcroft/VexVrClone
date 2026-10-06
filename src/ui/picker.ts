@@ -1,5 +1,6 @@
 import { PLAYGROUNDS } from "../playgrounds";
 import { FloorPainter } from "../render/floor";
+import { World } from "../sim/world";
 
 const $ = (id: string) => document.getElementById(id)!;
 
@@ -13,7 +14,19 @@ export function setupPicker(current: () => string, onPick: (id: string) => void)
     if (!thumbs.has(id)) {
       const def = PLAYGROUNDS.find((p) => p.id === id)!;
       const painter = new FloorPainter(def.size.w, def.size.h, 320);
-      def.paintFloor(painter);
+      const layout = def.generate?.();
+      def.paintFloor(painter, layout);
+      // Draw walls and objects from above so mazes and castles show up.
+      const world = new World();
+      def.build?.(world, layout);
+      for (const o of world.objects) {
+        if (o.tag === "floor") continue;
+        const p = World.position(o.body);
+        const color = `#${o.color.toString(16).padStart(6, "0")}`;
+        if (o.shape.kind === "box") painter.rect(p.x, p.y, o.shape.w, o.shape.d, color);
+        else painter.circle(p.x, p.y, o.shape.r, color);
+      }
+      world.physics.free();
       thumbs.set(id, painter.canvas.toDataURL());
     }
     return thumbs.get(id)!;
