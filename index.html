@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RoboCode Sim</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect x='4' y='8' width='24' height='18' rx='5' fill='%23ff8a3d'/><circle cx='12' cy='17' r='3' fill='%2323263a'/><circle cx='20' cy='17' r='3' fill='%2323263a'/><rect x='14' y='3' width='4' height='6' rx='2' fill='%2323263a'/></svg>" />
+  </head>
+  <body>
+    <header id="topbar">
+      <div class="brand">
+        <svg viewBox="0 0 32 32" width="26" height="26" aria-hidden="true">
+          <rect x="4" y="8" width="24" height="18" rx="5" fill="#ff8a3d" />
+          <circle cx="12" cy="17" r="3" fill="#23263a" />
+          <circle cx="20" cy="17" r="3" fill="#23263a" />
+          <rect x="14" y="3" width="4" height="6" rx="2" fill="#ff8a3d" />
+        </svg>
+        <span id="app-name">RoboCode Sim</span>
+      </div>
+      <div class="menu">
+        <button class="tb-btn" id="file-btn" aria-haspopup="true">File ▾</button>
+        <div class="menu-list" id="file-menu" hidden>
+          <button data-action="new-blocks">New Blocks Project</button>
+          <button data-action="new-python">New Python Project</button>
+          <hr />
+          <button data-action="open">Open…</button>
+          <button data-action="save">Save to your computer</button>
+        </div>
+      </div>
+      <input id="project-name" value="Untitled Project" aria-label="Project name" spellcheck="false" />
+      <span id="mode-badge">Blocks</span>
+      <span id="python-status" class="status-pill">Loading Python…</span>
+      <div class="spacer"></div>
+      <button class="tb-btn" id="select-playground">Select Playground</button>
+      <button class="tb-btn" id="toggle-playground">Open Playground</button>
+      <div class="run-controls">
+        <button class="run-btn step" id="btn-step" title="Run one block at a time">Step</button>
+        <button class="run-btn start" id="btn-start">▶ Start</button>
+        <button class="run-btn stop" id="btn-stop" disabled>■ Stop</button>
+      </div>
+    </header>
+
+    <main id="workspace">
+      <div id="editor-area">
+        <div id="blockly"></div>
+        <div id="python-editor" hidden></div>
+        <aside id="code-viewer" hidden>
+          <div class="panel-head">
+            <span>Python code</span>
+            <button class="small-btn" id="copy-to-python" title="Start a new Python project from this code">Open as Python project</button>
+          </div>
+          <pre id="code-viewer-text"></pre>
+        </aside>
+        <button id="code-viewer-tab" title="Show the Python for your blocks">{ }</button>
+      </div>
+
+      <section id="console-panel">
+        <div class="panel-head">
+          <span>Print Console</span>
+          <div>
+            <button class="small-btn" id="console-clear">Clear</button>
+            <button class="small-btn" id="console-toggle">Hide</button>
+          </div>
+        </div>
+        <div id="console-output" role="log" aria-live="polite"></div>
+      </section>
+
+      <section id="playground-window">
+        <div class="pw-title" id="pw-title">
+          <span id="pw-name">Grid Map</span>
+          <div class="pw-buttons">
+            <button class="pw-btn" id="pw-expand" title="Bigger / smaller">⤢</button>
+            <button class="pw-btn" id="pw-close" title="Close">✕</button>
+          </div>
+        </div>
+        <div class="pw-view" id="pw-view">
+          <div id="dashboard" hidden></div>
+          <div id="pw-timer">0.0 s</div>
+        </div>
+        <div class="pw-bar">
+          <div class="seg" role="group" aria-label="Camera">
+            <button data-camera="top" class="active">Top</button>
+            <button data-camera="aligned">Follow</button>
+            <button data-camera="free">Free</button>
+          </div>
+          <button class="small-btn" id="pw-dashboard">Dashboard</button>
+          <button class="small-btn" id="pw-reset">↺ Reset</button>
+        </div>
+      </section>
+    </main>
+
+    <div id="picker" class="modal" hidden>
+      <div class="modal-box">
+        <div class="panel-head">
+          <span>Select Playground</span>
+          <button class="small-btn" id="picker-close">Close</button>
+        </div>
+        <div id="picker-grid"></div>
+      </div>
+    </div>
+
+    <input type="file" id="open-file" accept=".rcsim,.json,.py,.txt" hidden />
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

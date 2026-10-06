@@ -1,0 +1,4 @@
+{"format":"robocode-sim","version":1,"name":"Step test","mode":"blocks","playground":"grid-map",
+ "blocks":{"blocks":{"languageVersion":0,"blocks":[{"type":"vr_when_started","x":40,"y":40,"next":{"block":
+  {"type":"vr_drive_for","id":"drive1","fields":{"DIR":"FORWARD","UNITS":"MM","WAIT":"WAIT"},"inputs":{"DISTANCE":{"shadow":{"type":"math_number","fields":{"NUM":400}}}},
+   "next":{"block":{"type":"vr_turn_for","id":"turn1","fields":{"DIR":"RIGHT","WAIT":"WAIT"},"inputs":{"ANGLE":{"shadow":{"type":"math_number","fields":{"NUM":90}}}}}}}}}]}}}

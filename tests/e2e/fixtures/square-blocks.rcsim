@@ -1,0 +1,7 @@
+{"format":"robocode-sim","version":1,"name":"Square test","mode":"blocks","playground":"grid-map",
+ "blocks":{"blocks":{"languageVersion":0,"blocks":[{"type":"vr_when_started","x":40,"y":40,"next":{"block":
+  {"type":"vr_repeat","inputs":{"TIMES":{"shadow":{"type":"math_number","fields":{"NUM":2}}},
+   "DO":{"block":{"type":"vr_drive_for","fields":{"DIR":"FORWARD","UNITS":"MM","WAIT":"WAIT"},"inputs":{"DISTANCE":{"shadow":{"type":"math_number","fields":{"NUM":400}}}},
+     "next":{"block":{"type":"vr_turn_for","fields":{"DIR":"RIGHT","WAIT":"WAIT"},"inputs":{"ANGLE":{"shadow":{"type":"math_number","fields":{"NUM":90}}}}}}}}},
+   "next":{"block":{"type":"vr_print","fields":{"NEWLINE":"YES"},"inputs":{"VALUE":{"shadow":{"type":"text","fields":{"TEXT":"heading:"}}}},
+     "next":{"block":{"type":"vr_print","fields":{"NEWLINE":"YES"},"inputs":{"VALUE":{"shadow":{"type":"text","fields":{"TEXT":""}},"block":{"type":"vr_drive_heading"}}}}}}}}}}]}}}
