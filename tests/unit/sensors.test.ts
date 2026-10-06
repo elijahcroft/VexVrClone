@@ -90,7 +90,7 @@ describe("sensors", () => {
 describe("magnet and pen", () => {
   it("BOOST picks up the disk ahead; it travels with the robot; DROP releases it", async () => {
     const { world, robot } = setup({ x: 0, y: 0, heading: 0 }, (w) =>
-      w.add({ shape: { kind: "cylinder", r: 50, h: 20 }, x: 0, y: 160, color: 0x2255dd, tag: "disk", dynamic: true }),
+      w.add({ shape: { kind: "cylinder", r: 50, h: 20 }, x: 0, y: 160, color: 0x2255dd, tag: "disk", pickable: true, dynamic: true }),
     );
     const disk = world.objects.find((o) => o.tag === "disk")!;
     robot.magnet.energize("BOOST");

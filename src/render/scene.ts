@@ -18,6 +18,7 @@ export class SceneView {
   private robot: ReturnType<typeof buildRobotModel> | null = null;
   private floorTexture: THREE.CanvasTexture | null = null;
   private levelGroup = new THREE.Group();
+  private sun: THREE.DirectionalLight;
   private lastRobot = { x: 0, y: 0, heading: 0 };
 
   constructor(private container: HTMLElement) {
@@ -29,12 +30,12 @@ export class SceneView {
 
     this.scene.background = new THREE.Color(0xdde5ee);
     this.scene.add(new THREE.HemisphereLight(0xffffff, 0x8a94a6, 1.6));
-    const sun = new THREE.DirectionalLight(0xffffff, 1.6);
+    const sun = (this.sun = new THREE.DirectionalLight(0xffffff, 1.6));
     sun.position.set(1.2, 3, 1.6);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
     Object.assign(sun.shadow.camera, { left: -2, right: 2, top: 2, bottom: -2, near: 0.5, far: 8 });
-    this.scene.add(sun);
+    this.scene.add(sun, sun.target);
     this.scene.add(this.levelGroup);
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
@@ -64,17 +65,37 @@ export class SceneView {
     this.levelGroup.clear();
     this.meshes = [];
     const { w, h } = session.def.size;
+    const theme = session.def.theme;
+
+    // Sky / water color and shadows sized to the field.
+    const sky = theme === "underwater" ? 0x0f5a7a : 0xdde5ee;
+    this.scene.background = new THREE.Color(sky);
+    this.scene.fog = theme === "underwater" ? new THREE.Fog(sky, 2.5, 7) : null;
+    const half = (Math.max(w, h) / 2) * MM + 0.5;
+    Object.assign(this.sun.shadow.camera, { left: -half, right: half, top: half, bottom: -half, far: half * 4 + 4 });
+    this.sun.position.set(half * 0.6, half * 1.5 + 1, half * 0.8);
+    this.sun.shadow.camera.updateProjectionMatrix();
 
     // Ground under the field (far below it for a raised table), then the
     // painted field itself.
     const raised = session.def.raised;
+    const groundColor = theme === "underwater" ? 0xcbb98a : raised ? 0x7d9a6a : 0xb9c2cd;
     const ground = new THREE.Mesh(
-      new THREE.BoxGeometry((w + (raised ? 4000 : 600)) * MM, 0.04, (h + (raised ? 4000 : 600)) * MM),
-      new THREE.MeshStandardMaterial({ color: raised ? 0x7d9a6a : 0xb9c2cd, roughness: 0.9 }),
+      new THREE.BoxGeometry((w + (raised ? 6000 : 600)) * MM, 0.04, (h + (raised ? 6000 : 600)) * MM),
+      new THREE.MeshStandardMaterial({ color: groundColor, roughness: 0.9 }),
     );
     ground.position.y = raised ? -TABLE_HEIGHT * MM - 0.021 : -0.021;
     ground.receiveShadow = true;
     this.levelGroup.add(ground);
+    if (theme === "island") {
+      const water = new THREE.Mesh(
+        new THREE.PlaneGeometry((w + 6000) * MM, (h + 6000) * MM),
+        new THREE.MeshStandardMaterial({ color: 0x2f7fb8, roughness: 0.3, transparent: true, opacity: 0.85 }),
+      );
+      water.rotation.x = -Math.PI / 2;
+      water.position.y = -0.22;
+      this.levelGroup.add(water);
+    }
 
     this.floorTexture?.dispose();
     this.floorTexture = new THREE.CanvasTexture(session.floor.canvas);
@@ -82,7 +103,8 @@ export class SceneView {
     this.floorTexture.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
     const floor = new THREE.Mesh(
       new THREE.PlaneGeometry(w * MM, h * MM),
-      new THREE.MeshStandardMaterial({ map: this.floorTexture, roughness: 0.95 }),
+      // alphaTest: non-rectangular fields leave the outside transparent.
+      new THREE.MeshStandardMaterial({ map: this.floorTexture, roughness: 0.95, alphaTest: 0.5 }),
     );
     floor.rotation.x = -Math.PI / 2;
     floor.position.y = 0.0005;
@@ -91,7 +113,7 @@ export class SceneView {
 
     for (const obj of session.world.objects) this.addObject(obj);
 
-    this.robot = buildRobotModel();
+    this.robot = buildRobotModel(session.robot.kind);
     this.levelGroup.add(this.robot.group);
     this.lastRobot = { ...session.robot.position, heading: session.robot.heading };
     this.setCamera(this.mode);
@@ -102,7 +124,7 @@ export class SceneView {
     const geo =
       s.kind === "box"
         ? new THREE.BoxGeometry(s.w * MM, s.h * MM, s.d * MM)
-        : new THREE.CylinderGeometry(s.r * MM, s.r * MM, s.h * MM, 32);
+        : new THREE.CylinderGeometry(s.r * MM, s.r * MM, s.h * MM, s.kind === "hex" ? 6 : 32);
     const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: obj.color, roughness: 0.7 }));
     mesh.castShadow = true;
     mesh.receiveShadow = true;

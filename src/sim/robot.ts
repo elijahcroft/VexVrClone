@@ -37,6 +37,8 @@ export class Drivetrain {
   private turnVelocity = 50;
   private timeout = 0;
   private headingZero = 0;
+  /** Out of battery: commands do nothing. */
+  disabled = false;
   private rotationZero = 0;
   /** Unwrapped actual heading since reset (the gyro). */
   private rot = 0;
@@ -48,10 +50,13 @@ export class Drivetrain {
   ) {
     this.lastHeading = bodyHeading(body);
     this.rot = this.lastHeading;
+    // Heading starts as the robot's real direction; rotation counts turns from 0.
+    this.rotationZero = this.rot;
   }
 
   /** Apply the current command's velocity for one step. */
   update(dt: number) {
+    if (this.disabled && this.motion.kind !== "idle") this.stop();
     const m = this.motion;
     let v = 0; // mm/s, along heading
     let w = 0; // deg/s, clockwise
@@ -206,7 +211,20 @@ export interface RobotStart {
   heading: number;
 }
 
+export type RobotKind = "vr_robot" | "underwater" | "mazebot";
+
+/** Which devices each robot has (names match VEXcode VR's Python names). */
+export const ROBOT_DEVICES: Record<RobotKind, string[]> = {
+  vr_robot: [
+    "drivetrain", "location", "left_bumper", "right_bumper", "front_eye", "down_eye",
+    "front_distance", "down_distance", "pen", "magnet",
+  ],
+  underwater: ["drivetrain", "location", "left_bumper", "right_bumper", "front_eye", "down_eye", "front_distance", "magnet"],
+  mazebot: ["drivetrain", "location", "front_distance", "left_distance", "right_distance", "down_eye", "pen"],
+};
+
 export interface RobotOptions {
+  kind?: RobotKind;
   /** The painted floor, for down-facing eye sensors and the pen. */
   floor?: () => (FloorReader & DrawSurface) | null;
   /** Playground override for what the eye reads at a spot (hidden art). */
@@ -218,8 +236,9 @@ export interface RobotOptions {
 /** Sensor states that fire events when they change. */
 type Watch = { event: string; on: string; off: string; read: () => boolean; last: boolean };
 
-/** The standard VR Robot: drivetrain, bumpers, eyes, distance, pen, magnet. */
+/** A VR robot; `kind` decides which devices it has. */
 export class Robot {
+  readonly kind: RobotKind;
   readonly body: RAPIER.RigidBody;
   readonly drivetrain: Drivetrain;
   readonly pen: Pen;
@@ -234,6 +253,7 @@ export class Robot {
     start: RobotStart,
     opts: RobotOptions = {},
   ) {
+    this.kind = opts.kind ?? "vr_robot";
     const { h, radius } = ROBOT_SIZE;
     const p = toPhysics(start.x, start.y, h / 2 + 1);
     const desc = RAPIER.RigidBodyDesc.dynamic()
@@ -261,8 +281,13 @@ export class Robot {
     const downEye = new Eye(mount, { x: 0, y: 60, z: 5 }, "down", floor, opts.colorAt);
     const frontDistance = new Distance(mount, { x: 0, y: radius, z: 50 }, false);
     const downDistance = new Distance(mount, { x: 0, y: 60, z: 5 }, true);
+    const leftDistance = new Distance(mount, { x: 0, y: 0, z: 50 }, false, -90, radius);
+    const rightDistance = new Distance(mount, { x: 0, y: 0, z: 50 }, false, 90, radius);
 
-    const add = (name: string, kind: string, api: unknown) => this.devices.set(name, { kind, api });
+    const has = new Set(ROBOT_DEVICES[this.kind]);
+    const add = (name: string, kind: string, api: unknown) => {
+      if (has.has(name)) this.devices.set(name, { kind, api });
+    };
     add("drivetrain", "Drivetrain", this.drivetrain);
     add("location", "Location", {
       x: () => this.position.x,
@@ -275,11 +300,14 @@ export class Robot {
     add("down_eye", "EyeSensor", downEye);
     add("front_distance", "Distance", frontDistance);
     add("down_distance", "Distance", downDistance);
+    add("left_distance", "Distance", leftDistance);
+    add("right_distance", "Distance", rightDistance);
     add("pen", "Pen", this.pen);
     add("magnet", "Electromagnet", this.magnet);
 
-    const watch = (event: string, on: string, off: string, read: () => boolean) =>
-      this.watches.push({ event, on, off, read, last: read() });
+    const watch = (event: string, on: string, off: string, read: () => boolean) => {
+      if (has.has(event)) this.watches.push({ event, on, off, read, last: read() });
+    };
     watch("left_bumper", "pressed", "released", () => leftBumper.pressed());
     watch("right_bumper", "pressed", "released", () => rightBumper.pressed());
     watch("front_eye", "object_detected", "object_lost", () => frontEye.near_object());

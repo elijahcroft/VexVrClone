@@ -89,7 +89,7 @@ export class Magnet {
     let best: SimObject | null = null;
     let bestDist = PICKUP_RANGE;
     for (const obj of this.world.objects) {
-      if (obj.tag !== "disk" || obj.removed) continue;
+      if (!obj.pickable || obj.removed) continue;
       const p = World.position(obj.body);
       const d = Math.hypot(p.x - at.x, p.y - at.y);
       if (d < bestDist && p.z < 100) {

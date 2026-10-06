@@ -1,3 +1,5 @@
+import { downloadText } from "../ui/files";
+
 /** A saved project: what's in the editor plus which playground it's for. */
 export interface Project {
   format: "robocode-sim";
@@ -50,10 +52,5 @@ export function parseProject(text: string, filename: string): Project | null {
 }
 
 export function downloadProject(project: Project) {
-  const blob = new Blob([JSON.stringify(project, null, 1)], { type: "application/json" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = `${project.name.trim() || "project"}.rcsim`;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  downloadText(JSON.stringify(project, null, 1), `${project.name.trim() || "project"}.rcsim`);
 }

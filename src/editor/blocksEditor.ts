@@ -1,8 +1,9 @@
 import * as Blockly from "blockly/core";
 import "blockly/blocks";
 import * as En from "blockly/msg/en";
-import { COLORS } from "./blocks/defs";
+import { COLORS, setAvailableDevices } from "./blocks/defs";
 import "./generate";
+import { ROBOT_DEVICES } from "../sim/robot";
 
 Blockly.setLocale(En as unknown as Record<string, string>);
 
@@ -11,9 +12,19 @@ const text = (t: string) => ({ shadow: { type: "text", fields: { TEXT: t } } });
 const block = (type: string, inputs?: Record<string, unknown>) => ({ kind: "block", type, inputs });
 const label = (text: string) => ({ kind: "label", text });
 
-const TOOLBOX = {
-  kind: "categoryToolbox",
-  contents: [
+/** The toolbox for a robot: categories and blocks only for devices it has. */
+function buildToolbox(devices: Set<string>) {
+  const has = (d: string) => devices.has(d);
+  const first = (...names: string[]) => names.find(has);
+  /** A block whose DEVICE dropdown starts on one of this robot's devices. */
+  const deviceBlock = (type: string, device: string | undefined) =>
+    device ? [{ kind: "block", type, fields: { DEVICE: device } }] : [];
+  const section = (title: string, items: object[]) => (items.length ? [label(title), ...items] : []);
+  const bumper = first("left_bumper", "right_bumper");
+  const eye = first("front_eye", "down_eye");
+  const distance = first("front_distance", "left_distance", "right_distance", "down_distance");
+
+  const categories = [
     {
       kind: "category",
       name: "Drivetrain",
@@ -43,28 +54,27 @@ const TOOLBOX = {
         block("vr_clear_rows"),
         block("vr_print_precision"),
         block("vr_print_color"),
-        label("Pen"),
-        block("vr_pen_move"),
-        block("vr_pen_color"),
-        block("vr_pen_width"),
-        block("vr_pen_color_rgb", { R: number(255), G: number(0), B: number(0), A: number(100) }),
-        block("vr_pen_fill", { R: number(255), G: number(0), B: number(0), A: number(100) }),
+        ...(has("pen")
+          ? [
+              label("Pen"),
+              block("vr_pen_move"),
+              block("vr_pen_color"),
+              block("vr_pen_width"),
+              block("vr_pen_color_rgb", { R: number(255), G: number(0), B: number(0), A: number(100) }),
+              block("vr_pen_fill", { R: number(255), G: number(0), B: number(0), A: number(100) }),
+            ]
+          : []),
       ],
     },
-    {
-      kind: "category",
-      name: "Magnet",
-      colour: COLORS.magnet,
-      contents: [block("vr_magnet")],
-    },
+    has("magnet") && { kind: "category", name: "Magnet", colour: COLORS.magnet, contents: [block("vr_magnet")] },
     {
       kind: "category",
       name: "Events",
       colour: COLORS.events,
       contents: [
         block("vr_when_started"),
-        block("vr_when_bumper"),
-        block("vr_when_eye"),
+        ...deviceBlock("vr_when_bumper", bumper),
+        ...deviceBlock("vr_when_eye", eye),
         block("vr_when_timer"),
         block("vr_when_i_receive"),
         block("vr_broadcast"),
@@ -101,15 +111,16 @@ const TOOLBOX = {
         block("vr_drive_is_moving"),
         block("vr_drive_heading"),
         block("vr_drive_rotation"),
-        label("Bumpers"),
-        block("vr_bumper_pressed"),
-        label("Eye sensors"),
-        block("vr_eye_near"),
-        block("vr_eye_detects"),
-        block("vr_eye_brightness"),
-        label("Distance sensors"),
-        block("vr_distance_found"),
-        block("vr_distance"),
+        ...section("Bumpers", deviceBlock("vr_bumper_pressed", bumper)),
+        ...section("Eye sensors", [
+          ...deviceBlock("vr_eye_near", eye),
+          ...deviceBlock("vr_eye_detects", eye),
+          ...deviceBlock("vr_eye_brightness", eye),
+        ]),
+        ...section("Distance sensors", [
+          ...deviceBlock("vr_distance_found", distance),
+          ...deviceBlock("vr_distance", distance),
+        ]),
         label("Location"),
         block("vr_position"),
         block("vr_position_angle"),
@@ -136,8 +147,15 @@ const TOOLBOX = {
     },
     { kind: "category", name: "Variables", colour: "#ff8c1a", custom: "VR_VARIABLES" },
     { kind: "category", name: "My Blocks", colour: "#ff6680", custom: "PROCEDURE" },
-  ],
-};
+  ];
+  return { kind: "categoryToolbox", contents: categories.filter(Boolean) } as Blockly.utils.toolbox.ToolboxDefinition;
+}
+
+/** Show the blocks for a playground's robot (call when the playground changes). */
+export function setRobotDevices(ws: Blockly.WorkspaceSvg, devices: string[]) {
+  setAvailableDevices(devices);
+  ws.updateToolbox(buildToolbox(new Set(devices)));
+}
 
 const theme = Blockly.Theme.defineTheme("robocode", {
   name: "robocode",
@@ -199,7 +217,7 @@ export const DEFAULT_BLOCKS = {
 
 export function createBlocksEditor(container: HTMLElement) {
   const ws = Blockly.inject(container, {
-    toolbox: TOOLBOX,
+    toolbox: buildToolbox(new Set(ROBOT_DEVICES.vr_robot)),
     renderer: "zelos",
     theme,
     trashcan: true,

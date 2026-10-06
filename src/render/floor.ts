@@ -48,6 +48,15 @@ export class FloorPainter {
     c.stroke();
   }
 
+  polygon(points: { x: number; y: number }[], color: string) {
+    const c = this.ctx;
+    c.beginPath();
+    points.forEach((p, i) => (i ? c.lineTo(...this.px(p.x, p.y)) : c.moveTo(...this.px(p.x, p.y))));
+    c.closePath();
+    c.fillStyle = color;
+    c.fill();
+  }
+
   circle(x: number, y: number, r: number, color: string, stroke?: number) {
     const c = this.ctx;
     c.beginPath();

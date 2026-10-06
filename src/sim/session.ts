@@ -21,13 +21,13 @@ export class SimSession {
     readonly startIndex = 0,
   ) {
     const { w, h } = def.size;
-    this.layout = def.generate?.();
+    this.layout = def.generate?.(startIndex);
     this.floor = new FloorPainter(w, h);
     def.paintFloor(this.floor, this.layout);
     if (def.raised) {
       this.world.addFloor(w + 6000, h + 6000, -TABLE_HEIGHT);
       this.world.add({
-        shape: { kind: "box", w, d: h, h: TABLE_HEIGHT },
+        shape: def.raised === "hex" ? { kind: "hex", r: w / 2, h: TABLE_HEIGHT } : { kind: "box", w, d: h, h: TABLE_HEIGHT },
         x: 0,
         y: 0,
         z: -TABLE_HEIGHT,
@@ -39,12 +39,14 @@ export class SimSession {
       if (def.border !== false) this.world.addBorder(w, h);
     }
     def.build?.(this.world, this.layout);
-    const start = def.starts?.[startIndex]?.pose ?? def.start;
+    const start = def.startFor?.(this.layout) ?? def.starts?.[startIndex]?.pose ?? def.start;
     this.robot = new Robot(this.world, start, {
+      kind: def.robot,
       floor: () => this.floor,
       colorAt: def.colorAt && ((x, y) => def.colorAt!(x, y, this.layout)),
       onDraw: () => (this.floorDirty = true),
     });
+    if (def.onStep) this.world.onStep((dt) => def.onStep!(this.world, this.robot, this.layout, dt));
   }
 
   /** Goal progress text for the playground window, if the playground has one. */

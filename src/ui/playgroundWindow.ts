@@ -1,4 +1,5 @@
 import type { CameraMode, SceneView } from "../render/scene";
+import { topDown } from "../render/topdown";
 import type { SimSession } from "../sim/session";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -54,6 +55,50 @@ export function setupPlaygroundWindow(opts: {
     });
   }
 
+  const minimap = $<HTMLCanvasElement>("pw-minimap");
+  const minimapCtx = minimap.getContext("2d")!;
+  let minimapBase: HTMLCanvasElement | null = null;
+  const tools = $("pw-tools");
+
+  /** Rebuild per-playground extras (minimap, tool buttons) for a new session. */
+  function setSession(session: SimSession) {
+    minimap.hidden = !session.def.minimap;
+    minimapBase = session.def.minimap ? topDown(session.def, session.layout, 360).canvas : null;
+    tools.textContent = "";
+    for (const tool of session.def.tools ?? []) {
+      const b = document.createElement("button");
+      b.className = "small-btn";
+      b.textContent = tool.label;
+      b.addEventListener("click", () => void tool.run(opts.session(), opts.onReset));
+      tools.appendChild(b);
+    }
+  }
+
+  function drawMinimap(session: SimSession) {
+    if (!minimapBase) return;
+    const { w, h } = session.def.size;
+    const W = minimap.width;
+    minimapCtx.drawImage(minimapBase, 0, 0, W, W);
+    const p = session.robot.position;
+    const x = ((p.x + w / 2) / w) * W;
+    const y = ((h / 2 - p.y) / h) * W;
+    const a = (session.robot.heading * Math.PI) / 180;
+    minimapCtx.save();
+    minimapCtx.translate(x, y);
+    minimapCtx.rotate(a);
+    minimapCtx.fillStyle = "#ff8a3d";
+    minimapCtx.strokeStyle = "#23263a";
+    minimapCtx.lineWidth = 2;
+    minimapCtx.beginPath();
+    minimapCtx.moveTo(0, -9);
+    minimapCtx.lineTo(7, 7);
+    minimapCtx.lineTo(-7, 7);
+    minimapCtx.closePath();
+    minimapCtx.fill();
+    minimapCtx.stroke();
+    minimapCtx.restore();
+  }
+
   const timerEl = $("pw-timer");
   const statusEl = $("pw-status");
   const fmt = (n: number, digits = 0) => n.toFixed(digits);
@@ -63,6 +108,7 @@ export function setupPlaygroundWindow(opts: {
   /** Refresh text overlays; call once per frame. */
   function update() {
     showCamera(opts.view.cameraMode);
+    drawMinimap(opts.session());
     timerEl.textContent = `${opts.timer().toFixed(1)} s`;
     const status = opts.session().status();
     statusEl.hidden = !status;
@@ -84,27 +130,22 @@ export function setupPlaygroundWindow(opts: {
       ["Angle", deg(robot.heading)],
     ];
     type Api = Record<string, () => unknown>;
-    const dev = (name: string) => robot.device<Api>(name);
     const yes = (v: unknown) => (v ? "yes" : "no");
-    const sensors: [string, string][] = [
-      ["Left bumper", dev("left_bumper").pressed() ? "pressed" : "released"],
-      ["Right bumper", dev("right_bumper").pressed() ? "pressed" : "released"],
-    ];
-    for (const eye of ["front_eye", "down_eye"]) {
-      const e = dev(eye);
-      const label = eye === "front_eye" ? "Front eye" : "Down eye";
-      sensors.push([label, `${yes(e.near_object())} · ${String(e.color()).toLowerCase()} · ${e.brightness()}%`]);
+    const sensors: [string, string][] = [];
+    for (const [name, { kind, api }] of robot.devices) {
+      const d = api as Api;
+      const label = name.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
+      if (kind === "Bumper") sensors.push([label, d.pressed() ? "pressed" : "released"]);
+      if (kind === "EyeSensor") {
+        sensors.push([label, `${yes(d.near_object())} · ${String(d.color()).toLowerCase()} · ${d.brightness()}%`]);
+      }
+      if (kind === "Distance") sensors.push([label, d.found_object() ? `${d.get_distance()} mm` : "none"]);
+      if (kind === "Electromagnet") sensors.push([label, robot.magnet.holding ? "holding" : "empty"]);
     }
-    for (const d of ["front_distance", "down_distance"]) {
-      const s = dev(d);
-      const label = d === "front_distance" ? "Front distance" : "Down distance";
-      sensors.push([label, s.found_object() ? `${s.get_distance()} mm` : "none"]);
-    }
-    sensors.push(["Magnet", robot.magnet.holding ? "holding disk" : "empty"]);
     const section = (name: string, list: [string, string][]) =>
       `<h4>${name}</h4>` + list.map(([k, v]) => `<div class="row"><span>${k}</span><b>${v}</b></div>`).join("");
     dashboard.innerHTML = section("Drivetrain", rows) + section("Location", location) + section("Sensors", sensors);
   }
 
-  return { update, setOpen, setTitle: (name: string) => ($("pw-name").textContent = name) };
+  return { update, setOpen, setSession, setTitle: (name: string) => ($("pw-name").textContent = name) };
 }

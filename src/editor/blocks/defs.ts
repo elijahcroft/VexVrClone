@@ -52,7 +52,15 @@ const EYES: [string, string][] = [
 const DISTANCES: [string, string][] = [
   ["front distance", "front_distance"],
   ["down distance", "down_distance"],
+  ["left distance", "left_distance"],
+  ["right distance", "right_distance"],
 ];
+
+/** Devices on the current playground's robot; device dropdowns show only these. */
+let availableDevices = new Set<string>();
+export function setAvailableDevices(devices: Iterable<string>) {
+  availableDevices = new Set(devices);
+}
 const EYE_COLORS: [string, string][] = [
   ["red", "RED"],
   ["green", "GREEN"],
@@ -911,6 +919,14 @@ export function registerBlocks(generator: PythonGenerator) {
     // Hats aren't steps themselves; don't highlight/step on them.
     this.suppressPrefixSuffix = true;
   });
+  Blockly.Extensions.register("vr_devices", function (this: Blockly.Block) {
+    const field = this.getField("DEVICE") as Blockly.FieldDropdown;
+    const all = field.getOptions(false) as [string, string][];
+    field.setOptions(() => {
+      const mine = all.filter(([, v]) => availableDevices.has(v));
+      return mine.length ? mine : all;
+    });
+  });
   Blockly.common.defineBlocksWithJsonArray(
     SPECS.map((s) => {
       const json: Record<string, unknown> = {
@@ -925,7 +941,14 @@ export function registerBlocks(generator: PythonGenerator) {
       if (s.output !== undefined) json.output = s.output;
       if (s.statement) Object.assign(json, { previousStatement: null, nextStatement: null });
       if (s.cap) json.previousStatement = null;
-      if (s.hat) Object.assign(json, { nextStatement: null, extensions: ["vr_hat"] });
+      const extensions: string[] = [];
+      if (s.hat) {
+        json.nextStatement = null;
+        extensions.push("vr_hat");
+      }
+      const usesDevice = [s.args0, s.args1].flat().some((a) => (a as { name?: string } | undefined)?.name === "DEVICE");
+      if (usesDevice) extensions.push("vr_devices");
+      if (extensions.length) json.extensions = extensions;
       if (s.inputsInline) json.inputsInline = true;
       return json;
     }),

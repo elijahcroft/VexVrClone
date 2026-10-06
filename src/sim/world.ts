@@ -27,7 +27,16 @@ export function bodyHeading(body: RAPIER.RigidBody) {
 
 export type Shape =
   | { kind: "box"; w: number; d: number; h: number } // mm: width (x), depth (y), height
-  | { kind: "cylinder"; r: number; h: number };
+  | { kind: "cylinder"; r: number; h: number }
+  | { kind: "hex"; r: number; h: number }; // hexagonal prism, corner radius r
+
+/** Corner points (field mm, relative to center) of a hex prism, matching Three's 6-sided cylinder. */
+export function hexCorners(r: number) {
+  return Array.from({ length: 6 }, (_, i) => {
+    const a = (i * Math.PI) / 3;
+    return { x: r * Math.sin(a), y: -r * Math.cos(a) };
+  });
+}
 
 /** Anything the renderer should draw and keep in sync with physics. */
 export interface SimObject {
@@ -42,6 +51,8 @@ export interface SimObject {
   removed?: boolean;
   /** Carried by the magnet; sensors ignore it. */
   held?: boolean;
+  /** The magnet can pick it up (disks, trash). */
+  pickable?: boolean;
 }
 
 interface Waiter {
@@ -128,15 +139,32 @@ export class World {
       .setTranslation(pos.x, pos.y, pos.z)
       .setRotation(headingQuat(heading));
     const body = this.physics.createRigidBody(desc);
-    const col =
-      shape.kind === "box"
-        ? RAPIER.ColliderDesc.cuboid((shape.w / 2) * MM, (height / 2) * MM, (shape.d / 2) * MM)
-        : RAPIER.ColliderDesc.cylinder((height / 2) * MM, shape.r * MM);
-    col.setFriction(opts.friction ?? 0.5).setDensity(opts.density ?? 500);
-    const collider = this.physics.createCollider(col, body);
-    const obj: SimObject = { body, shape, color: opts.color, tag: opts.tag, eyeColor: opts.eyeColor };
+    let cols: RAPIER.ColliderDesc[];
+    if (shape.kind === "box") {
+      cols = [RAPIER.ColliderDesc.cuboid((shape.w / 2) * MM, (height / 2) * MM, (shape.d / 2) * MM)];
+    } else if (shape.kind === "cylinder") {
+      cols = [RAPIER.ColliderDesc.cylinder((height / 2) * MM, shape.r * MM)];
+    } else {
+      // A regular hexagon is exactly three rectangles rotated 60 degrees
+      // apart; boxes give much steadier contacts than a convex hull.
+      const inradius = (shape.r * Math.sqrt(3)) / 2;
+      cols = [0, 60, 120].map((deg) =>
+        RAPIER.ColliderDesc.cuboid(inradius * MM, (height / 2) * MM, (shape.r / 2) * MM).setRotation(headingQuat(deg)),
+      );
+    }
+    const colliders = cols.map((c) =>
+      this.physics.createCollider(c.setFriction(opts.friction ?? 0.5).setDensity(opts.density ?? 500), body),
+    );
+    const obj: SimObject = {
+      body,
+      shape,
+      color: opts.color,
+      tag: opts.tag,
+      eyeColor: opts.eyeColor,
+      pickable: opts.pickable,
+    };
     this.objects.push(obj);
-    this.byCollider.set(collider.handle, obj);
+    for (const c of colliders) this.byCollider.set(c.handle, obj);
     return obj;
   }
 
@@ -149,7 +177,7 @@ export class World {
   remove(obj: SimObject) {
     if (obj.removed) return;
     obj.removed = true;
-    this.byCollider.delete(obj.body.collider(0).handle);
+    for (let i = 0; i < obj.body.numColliders(); i++) this.byCollider.delete(obj.body.collider(i).handle);
     this.physics.removeRigidBody(obj.body);
   }
 

@@ -1,4 +1,5 @@
 import type { FloorPainter } from "../render/floor";
+import { downloadUrl, pickFile } from "../ui/files";
 import type { PlaygroundDef } from "./types";
 
 function canvasFloor(p: FloorPainter) {
@@ -62,4 +63,53 @@ export const shapeTracer: PlaygroundDef = {
     p.circle(CIRCLE.cx, CIRCLE.cy, CIRCLE.r, OUTLINE, 12);
     p.circle(CIRCLE.cx - CIRCLE.r, CIRCLE.cy, 22, "#22a55a");
   },
+};
+
+/** Art Canvas+ background picture; kept across resets until cleared. */
+let background: ImageBitmap | null = null;
+
+function paintPlus(p: FloorPainter) {
+  p.fill("#ffffff");
+  if (!background) return;
+  // Fit the picture inside the canvas, centered.
+  const { width: W, height: H } = p.canvas;
+  const s = Math.min(W / background.width, H / background.height);
+  const w = background.width * s;
+  const h = background.height * s;
+  p.ctx.drawImage(background, (W - w) / 2, (H - h) / 2, w, h);
+}
+
+export const artCanvasPlus: PlaygroundDef = {
+  id: "art-canvas-plus",
+  name: "Art Canvas+",
+  description: "Art Canvas with your own background picture to trace, and a Download Canvas button.",
+  size: { w: 2000, h: 2000 },
+  start: { x: 0, y: 0, heading: 0 },
+  paintFloor: paintPlus,
+  tools: [
+    {
+      label: "Background image",
+      async run(session) {
+        const file = await pickFile("image/png,image/jpeg");
+        if (!file) return;
+        background = await createImageBitmap(file);
+        paintPlus(session.floor);
+        session.floorDirty = true;
+      },
+    },
+    {
+      label: "Download Canvas",
+      run(session) {
+        downloadUrl(session.floor.canvas.toDataURL("image/png"), "art-canvas.png");
+      },
+    },
+    {
+      label: "Clear",
+      run(session) {
+        background = null;
+        paintPlus(session.floor);
+        session.floorDirty = true;
+      },
+    },
+  ],
 };

@@ -147,14 +147,22 @@ export class Eye {
 export class Distance {
   static readonly MAX = 3000;
 
+  /**
+   * @param angle Direction relative to the robot's heading (side sensors).
+   * @param inset Distance from the ray origin to the robot's surface, which
+   *   is subtracted so readings start at the robot's edge.
+   */
   constructor(
     private mount: Mounting,
     private where: Mount,
     private down: boolean,
+    private angle = 0,
+    private inset = 0,
   ) {}
 
   private hit() {
-    return this.mount.cast(this.where, Distance.MAX, this.down);
+    const hit = this.mount.cast(this.where, Distance.MAX + this.inset, this.down, this.angle);
+    return hit && { ...hit, distance: hit.distance - this.inset };
   }
 
   found_object() {
@@ -163,7 +171,7 @@ export class Distance {
 
   get_distance() {
     const hit = this.hit();
-    return hit ? Math.round(hit.distance) : Distance.MAX;
+    return hit ? Math.round(Math.max(0, hit.distance)) : Distance.MAX;
   }
 }
 

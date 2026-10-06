@@ -1,14 +1,21 @@
 import * as THREE from "three";
-import { ROBOT_SIZE } from "../sim/robot";
+import { ROBOT_SIZE, type RobotKind } from "../sim/robot";
 import { MM } from "../sim/world";
 
+const PAINT: Record<RobotKind, { body: number; plate: number }> = {
+  vr_robot: { body: 0x3b4252, plate: 0xff8a3d },
+  underwater: { body: 0x1f4e79, plate: 0xffd23f },
+  mazebot: { body: 0x2f3b2f, plate: 0x4ade80 },
+};
+
 /**
- * Original robot look: dark chassis, orange top plate, four wheels, a front
- * bumper bar and an eye sensor. Built around the physics box's center, with
+ * Original robot look: chassis, colored top plate (per robot kind), four
+ * wheels, a front bumper bar and an eye sensor. Built around the physics box's center, with
  * -Z as the robot's front.
  */
-export function buildRobotModel() {
+export function buildRobotModel(kind: RobotKind = "vr_robot") {
   const { w, l, h } = ROBOT_SIZE;
+  const paint = PAINT[kind];
   const g = new THREE.Group();
   const mat = (color: number, extra: THREE.MeshStandardMaterialParameters = {}) =>
     new THREE.MeshStandardMaterial({ color, roughness: 0.6, metalness: 0.1, ...extra });
@@ -27,8 +34,12 @@ export function buildRobotModel() {
   const bottom = -h / 2;
 
   // Chassis and top plate.
-  box(bodyW, 50, l - 20, 0x3b4252, 0, bottom + 14 + 25, 0);
-  box(bodyW + 10, 8, l - 30, 0xff8a3d, 0, bottom + 14 + 54, 6);
+  box(bodyW, 50, l - 20, paint.body, 0, bottom + 14 + 25, 0);
+  box(bodyW + 10, 8, l - 30, paint.plate, 0, bottom + 14 + 54, 6);
+  if (kind === "mazebot") {
+    // Side distance sensors.
+    for (const sx of [-1, 1]) box(12, 20, 28, 0x2e3440, sx * (bodyW / 2 + 6), bottom + 14 + 40, 0);
+  }
   // Brain with a small screen.
   box(70, 34, 60, 0x2e3440, 0, bottom + 14 + 75, 30);
   const screen = box(54, 2, 40, 0x88c0d0, 0, bottom + 14 + 93, 30);

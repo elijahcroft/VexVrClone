@@ -51,6 +51,7 @@ export function disk(world: World, x: number, y: number, color: ColorName) {
     color: COLOR[color].hex,
     eyeColor: color,
     tag: "disk",
+    pickable: true,
     dynamic: true,
     density: 300,
   });

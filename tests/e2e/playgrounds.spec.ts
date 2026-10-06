@@ -113,3 +113,86 @@ test("Hidden Pixel Art: reads and fills the picture", async ({ page }) => {
   expect(await floorColor(page, -100, 100)).toBe("RED"); // a heart pixel
   expect(await floorColor(page, -100, -700)).toBe("GREEN"); // the stem
 });
+
+// ------------------------------------------------------------- milestone 3
+
+/** Load an inline Python program as if opened from a .py file. */
+async function loadPython(page: Page, code: string) {
+  await page.setInputFiles("#open-file", { name: "test.py", mimeType: "text/plain", buffer: Buffer.from(code) });
+}
+
+const fixture = (name: string) => fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url));
+
+test("Coral Reef Cleanup: all trash recycled before the battery dies", async ({ page }) => {
+  await setup(page, "Coral Reef Cleanup", "coral-reef-cleanup/collect_trash.py");
+  await run(page);
+  await expect(consoleText(page)).toHaveText("Reef is clean!");
+  await expect(status(page)).toHaveText("All 8 pieces of trash collected!");
+});
+
+test("Coral Reef Cleanup: the battery runs out and the robot stops", async ({ page }) => {
+  await setup(page, "Coral Reef Cleanup", "coral-reef-cleanup/collect_trash.py");
+  await loadPython(page, "while True:\n    drivetrain.drive_for(FORWARD, 300, MM)\n    drivetrain.drive_for(REVERSE, 300, MM)\n");
+  await page.click("#btn-start");
+  await expect(status(page)).toContainText("Battery empty!", { timeout: 300_000 });
+  const y1 = await page.evaluate(() => (window as any).rcsim.session().robot.position.y);
+  await page.waitForTimeout(1000);
+  expect(await page.evaluate(() => (window as any).rcsim.session().robot.position.y)).toBeCloseTo(y1, 0);
+  await page.click("#btn-stop");
+});
+
+test("Castle Crasher+: castles pushed into the water, robot stays dry", async ({ page }) => {
+  await setup(page, "Castle Crasher+", "castle-crasher-plus/bulldoze.py");
+  await run(page);
+  await expect(consoleText(page)).toHaveText("Safe on shore");
+  const text = (await status(page).textContent())!;
+  expect(text).not.toContain("fell in");
+  expect(Number(text.match(/water: ([\d.]+)/)![1])).toBeGreaterThan(2);
+});
+
+test("Castle Crasher+ Level 2: the eye sees trees as green", async ({ page }) => {
+  await setup(page, "Castle Crasher+", "castle-crasher-plus/bulldoze.py", "Level 2 (trees)");
+  await loadPython(
+    page,
+    "import math\n" +
+      "drivetrain.turn_to_heading(math.degrees(math.atan2(500 - 1014, 420 - 50)) % 360, DEGREES)\n" +
+      "while not front_eye.near_object():\n    drivetrain.drive_for(FORWARD, 20, MM)\n" +
+      "print(front_eye.detect(GREEN))\n",
+  );
+  await run(page);
+  await expect(consoleText(page)).toHaveText("True");
+});
+
+test("Wall Maze+: MazeBot side sensors solve the big maze", async ({ page }) => {
+  await setup(page, "Wall Maze+", "wall-maze-plus/right_wall.py");
+  await expect(page.locator("#pw-minimap")).toBeVisible();
+  await run(page);
+  await expect(status(page)).toHaveText("You reached the exit!");
+  await expect(consoleText(page)).toHaveText("Escaped the big maze!");
+});
+
+test("Wall Maze+: edit the maze, then go back to the built-in one", async ({ page }) => {
+  await setup(page, "Wall Maze+", "wall-maze-plus/right_wall.py");
+  const ahead = () =>
+    page.evaluate(() => (window as any).rcsim.session().robot.device("front_distance").get_distance());
+  expect(await ahead()).toBeLessThan(3000);
+  await page.click("#pw-tools button:text-is('Edit maze')");
+  await page.click("[data-act=clear]");
+  await page.click("[data-act=save]");
+  await expect.poll(ahead).toBe(3000); // nothing ahead but the far outer wall
+  await page.click("#pw-tools button:text-is('Built-in maze')");
+  await expect.poll(ahead).toBeLessThan(3000);
+});
+
+test("Art Canvas+: background image, clear, download", async ({ page }) => {
+  await setup(page, "Art Canvas+", "art-canvas/star.py");
+  const chooser = page.waitForEvent("filechooser");
+  await page.click("#pw-tools button:text-is('Background image')");
+  await (await chooser).setFiles(fixture("red.png"));
+  await expect.poll(() => floorColor(page, 0, 0)).toBe("RED");
+  const download = page.waitForEvent("download");
+  await page.click("#pw-tools button:text-is('Download Canvas')");
+  expect((await download).suggestedFilename()).toBe("art-canvas.png");
+  await page.click("#pw-tools button:text-is('Clear')");
+  await expect.poll(() => floorColor(page, 0, 0)).toBe("NONE");
+});

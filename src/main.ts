@@ -1,6 +1,6 @@
 import "./style.css";
 import * as Blockly from "blockly/core";
-import { DEFAULT_BLOCKS, createBlocksEditor, loadBlocks, saveBlocks } from "./editor/blocksEditor";
+import { DEFAULT_BLOCKS, createBlocksEditor, loadBlocks, saveBlocks, setRobotDevices } from "./editor/blocksEditor";
 import { generatePython } from "./editor/generate";
 import { DEFAULT_PYTHON, createPythonEditor, selectLine, setPythonCode } from "./editor/pythonEditor";
 import { getPlayground } from "./playgrounds";
@@ -95,6 +95,7 @@ async function main() {
     onVisibilityChange: (open) => ($("toggle-playground").textContent = open ? "Close Playground" : "Open Playground"),
   });
   window_.setTitle(session.def.name);
+  window_.setSession(session);
   window_.setOpen(true);
   $("toggle-playground").addEventListener("click", () => window_.setOpen(!!$("playground-window").hidden));
 
@@ -108,7 +109,9 @@ async function main() {
     session = new SimSession(getPlayground(playgroundId), startIndex);
     view.load(session);
     window_.setTitle(session.def.name);
+    window_.setSession(session);
     showStarts();
+    setRobotDevices(ws, [...session.robot.devices.keys()]);
   }
 
   function showStarts() {
@@ -119,6 +122,7 @@ async function main() {
   }
   startSelect.addEventListener("change", () => void reset(state.playground, Number(startSelect.value)));
   showStarts();
+  setRobotDevices(ws, [...session.robot.devices.keys()]);
 
   const picker = setupPicker(
     () => state.playground,
