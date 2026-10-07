@@ -15,6 +15,7 @@ export const COLORS = {
   control: "#ffab19",
   sensing: "#5cb1d6",
   operators: "#59c059",
+  rover: "#cf63cf",
 };
 
 type Gen = (block: Blockly.Block, g: PythonGenerator) => string | [string, number] | null;
@@ -67,6 +68,13 @@ const EYE_COLORS: [string, string][] = [
   ["blue", "BLUE"],
   ["none", "NONE"],
 ];
+/** Rover Rescue targets; each block offers the ones VEX's matching command accepts. */
+const TARGETS: [string, string][] = [
+  ["minerals", "MINERALS"],
+  ["enemy", "ENEMY"],
+  ["base", "BASE"],
+];
+const ALL_TARGETS: [string, string][] = [...TARGETS, ["obstacle", "OBSTACLE"], ["hazard", "HAZARD"]];
 const WAIT_OPTIONS: [string, string][] = [
   ["▸", "WAIT"],
   ["and don't wait", "NOWAIT"],
@@ -906,6 +914,117 @@ const SPECS: BlockSpec[] = [
         pow10: `math.pow(10, ${a})`,
       };
       return [code[fn], Order.FUNCTION_CALL];
+    },
+  },
+
+  // --------------------------------------------------------------- rover
+  {
+    type: "vr_rover_drive_to",
+    message0: "%1 %2 %3",
+    args0: [
+      dropdown("ACTION", [["go to", "go_to"], ["turn to", "turn_to"], ["drive to", "drive_to"]]),
+      dropdown("THING", TARGETS),
+      dropdown("WAIT", WAIT_OPTIONS),
+    ],
+    colour: COLORS.drivetrain,
+    statement: true,
+    python: (b) => `drivetrain.${field(b, "ACTION")}(${field(b, "THING")}${waitArg(b)})\n`,
+  },
+  {
+    type: "vr_rover_action",
+    message0: "%1 minerals",
+    args0: [dropdown("ACTION", [["pick up", "pickup"], ["drop", "drop"], ["use", "use"]])],
+    colour: COLORS.rover,
+    statement: true,
+    python: (b) => `rover.${field(b, "ACTION")}(MINERALS)\n`,
+  },
+  {
+    type: "vr_rover_absorb",
+    message0: "absorb radiation from enemy",
+    colour: COLORS.rover,
+    statement: true,
+    python: () => "rover.absorb_radiation(ENEMY)\n",
+  },
+  {
+    type: "vr_rover_standby",
+    message0: "standby until battery is %1 %%",
+    args0: [value("PERCENT", "Number")],
+    colour: COLORS.rover,
+    statement: true,
+    python: (b, g) => `rover.standby(${num(b, g, "PERCENT")})\n`,
+  },
+  {
+    type: "vr_rover_value",
+    message0: "rover %1",
+    args0: [
+      dropdown("VALUE", [
+        ["battery level", "battery"],
+        ["minerals stored", "minerals_stored"],
+        ["storage capacity", "storage_capacity"],
+        ["level", "level"],
+        ["exp", "exp"],
+        ["enemy level", "enemy_level"],
+        ["enemy radiation", "enemy_radiation"],
+      ]),
+    ],
+    colour: COLORS.sensing,
+    output: "Number",
+    python: (b) => [`rover.${field(b, "VALUE")}()`, Order.FUNCTION_CALL],
+  },
+  {
+    type: "vr_rover_under_attack",
+    message0: "rover under attack?",
+    colour: COLORS.sensing,
+    output: "Boolean",
+    python: () => ["rover.under_attack()", Order.FUNCTION_CALL],
+  },
+  {
+    type: "vr_rover_detects",
+    message0: "rover %1 %2 ?",
+    args0: [dropdown("HOW", [["detects", "detects"], ["sees", "sees"]]), dropdown("THING", ALL_TARGETS)],
+    colour: COLORS.sensing,
+    output: "Boolean",
+    python: (b) => [`rover.${field(b, "HOW")}(${field(b, "THING")})`, Order.FUNCTION_CALL],
+  },
+  {
+    type: "vr_rover_angle",
+    message0: "angle to %1 in degrees",
+    args0: [dropdown("THING", TARGETS)],
+    colour: COLORS.sensing,
+    output: "Number",
+    python: (b) => [`rover.angle(${field(b, "THING")})`, Order.FUNCTION_CALL],
+  },
+  {
+    type: "vr_rover_distance",
+    message0: "distance to %1 in %2",
+    args0: [dropdown("THING", ALL_TARGETS), dropdown("UNITS", [["mm", "MM"], ["inches", "INCHES"]])],
+    colour: COLORS.sensing,
+    output: "Number",
+    python: (b) => [`rover.get_distance(${field(b, "THING")}, ${field(b, "UNITS")})`, Order.FUNCTION_CALL],
+  },
+  {
+    type: "vr_rover_location",
+    message0: "location of %1 %2 in %3",
+    args0: [
+      dropdown("THING", ALL_TARGETS),
+      dropdown("AXIS", [["X", "X"], ["Y", "Y"]]),
+      dropdown("UNITS", [["mm", "MM"], ["inches", "INCHES"]]),
+    ],
+    colour: COLORS.sensing,
+    output: "Number",
+    python: (b) => [`rover.location(${field(b, "THING")}, ${field(b, "AXIS")}, ${field(b, "UNITS")})`, Order.FUNCTION_CALL],
+  },
+  {
+    type: "vr_rover_when",
+    message0: "when rover %1",
+    args0: [dropdown("EVENT", [["is under attack", "under_attack"], ["levels up", "level_up"]])],
+    colour: COLORS.events,
+    hat: true,
+    python: (b, g) => {
+      const event = field(b, "EVENT");
+      const { name, code } = hatFunction(b, g, `onevent_rover_${event}`);
+      registrations.push(`rover.on_${event}(${name})`);
+      return code;
     },
   },
 ];

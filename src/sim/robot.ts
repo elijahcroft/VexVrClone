@@ -211,7 +211,7 @@ export interface RobotStart {
   heading: number;
 }
 
-export type RobotKind = "vr_robot" | "underwater" | "mazebot";
+export type RobotKind = "vr_robot" | "underwater" | "mazebot" | "rover";
 
 /** Which devices each robot has (names match VEXcode VR's Python names). */
 export const ROBOT_DEVICES: Record<RobotKind, string[]> = {
@@ -221,6 +221,8 @@ export const ROBOT_DEVICES: Record<RobotKind, string[]> = {
   ],
   underwater: ["drivetrain", "location", "left_bumper", "right_bumper", "front_eye", "down_eye", "front_distance", "magnet"],
   mazebot: ["drivetrain", "location", "front_distance", "left_distance", "right_distance", "down_eye", "pen"],
+  // The "rover" device itself is attached by the Rover Rescue playground.
+  rover: ["drivetrain", "front_distance", "rover"],
 };
 
 export interface RobotOptions {

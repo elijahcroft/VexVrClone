@@ -196,3 +196,11 @@ test("Art Canvas+: background image, clear, download", async ({ page }) => {
   await page.click("#pw-tools button:text-is('Clear')");
   await expect.poll(() => floorColor(page, 0, 0)).toBe("NONE");
 });
+
+test("Rover Rescue: deposit minerals at base and reach level 2", async ({ page }) => {
+  await setup(page, "Rover Rescue", "rover-rescue/level_up.py");
+  await run(page);
+  await expect(consoleText(page)).toContainText("Level 2!");
+  await expect(consoleText(page)).toContainText("Mission complete");
+  await expect(status(page)).toContainText("Level 2");
+});

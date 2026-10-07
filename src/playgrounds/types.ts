@@ -41,6 +41,8 @@ export interface PlaygroundDef<L = void> {
   colorAt?(x: number, y: number, layout: L): EyeColor | null;
   /** Goal progress shown over the playground, e.g. "Disks sorted: 3 / 9". */
   status?(world: World, robot: Robot, layout: L): string | null;
+  /** Runs once the robot exists (e.g. to attach playground devices). */
+  setup?(world: World, robot: Robot, layout: L): void;
   /** Game rules that run every physics step (battery drain, scoring). */
   onStep?(world: World, robot: Robot, layout: L, dt: number): void;
 }

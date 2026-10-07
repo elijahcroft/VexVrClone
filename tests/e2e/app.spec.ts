@@ -130,3 +130,17 @@ test("bumper event hat fires when the robot hits a wall", async ({ page }) => {
   await expect(page.locator("#console-output")).toHaveText("bump");
   expect((await robot(page)).y).toBeGreaterThan(850);
 });
+
+test("rover blocks generate VEX-style Python and run", async ({ page }) => {
+  const errors = await openApp(page);
+  await page.setInputFiles("#open-file", fixture("rover-blocks.rcsim"));
+  await expect(page.locator("#pw-name")).toHaveText("Rover Rescue");
+  await page.click("#code-viewer-tab");
+  await expect(page.locator("#code-viewer-text")).toContainText("drivetrain.turn_to(BASE)");
+  await expect(page.locator("#code-viewer-text")).toContainText("rover.pickup(MINERALS)");
+  await expect(page.locator("#code-viewer-text")).toContainText("rover.get_distance(BASE, MM)");
+  await expect(page.locator("#code-viewer-text")).toContainText("rover.on_level_up(onevent_rover_level_up_1)");
+  await runToEnd(page);
+  await expect(page.locator("#console-output > div")).toHaveText(["1", "0"]);
+  expect(errors).toEqual([]);
+});

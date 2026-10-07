@@ -1,0 +1,9 @@
+{"format":"robocode-sim","version":1,"name":"Rover","mode":"blocks","playground":"rover-rescue",
+ "blocks":{"blocks":{"languageVersion":0,"blocks":[
+  {"type":"vr_when_started","x":40,"y":40,"next":{"block":
+   {"type":"vr_rover_drive_to","fields":{"ACTION":"turn_to","THING":"BASE","WAIT":"WAIT"},"next":{"block":
+    {"type":"vr_rover_action","fields":{"ACTION":"pickup"},"next":{"block":
+     {"type":"vr_print","fields":{"NEWLINE":"YES"},"inputs":{"VALUE":{"block":{"type":"vr_rover_value","fields":{"VALUE":"level"}}}},"next":{"block":
+      {"type":"vr_print","fields":{"NEWLINE":"YES"},"inputs":{"VALUE":{"block":{"type":"vr_rover_distance","fields":{"THING":"BASE","UNITS":"MM"}}}},"next":{"block":
+       {"type":"vr_stop_project"}}}}}}}}}}},
+  {"type":"vr_rover_when","x":40,"y":300,"fields":{"EVENT":"level_up"},"next":{"block":{"type":"vr_rover_absorb"}}}]}}}

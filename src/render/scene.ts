@@ -112,6 +112,9 @@ export class SceneView {
     this.levelGroup.add(floor);
 
     for (const obj of session.world.objects) this.addObject(obj);
+    session.world.onAdded((obj) => {
+      if (this.session === session) this.addObject(obj);
+    });
 
     this.robot = buildRobotModel(session.robot.kind);
     this.levelGroup.add(this.robot.group);
@@ -171,8 +174,17 @@ export class SceneView {
       this.lastFloorUpload = now;
       this.floorChanged();
     }
+    // Drop meshes of removed objects (collected minerals, defeated enemies).
+    this.meshes = this.meshes.filter(({ obj, mesh }) => {
+      if (!obj.removed) return true;
+      this.levelGroup.remove(mesh);
+      if (mesh instanceof THREE.Mesh) {
+        mesh.geometry.dispose();
+        (mesh.material as THREE.Material).dispose();
+      }
+      return false;
+    });
     for (const { obj, mesh } of this.meshes) {
-      mesh.visible = !obj.removed;
       const t = obj.body.translation();
       const r = obj.body.rotation();
       mesh.position.set(t.x, t.y, t.z);

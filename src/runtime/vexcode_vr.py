@@ -29,7 +29,8 @@ for _n in (
     "MM INCHES DEGREES PERCENT SECONDS MSEC X Y "
     "UP DOWN BOOST DROP "
     "RED GREEN BLUE BLACK NONE "
-    "EXTRA_THIN THIN MEDIUM WIDE EXTRA_WIDE"
+    "EXTRA_THIN THIN MEDIUM WIDE EXTRA_WIDE "
+    "BASE ENEMY MINERALS OBSTACLE HAZARD"
 ).split():
     globals()[_n] = _Const(_n)
 del _n
@@ -264,6 +265,23 @@ class Drivetrain:
         done = self._dt.turn_to_rotation(angle)
         return done if wait else None
 
+    # Rover Rescue: face and/or drive to the nearest BASE, ENEMY or MINERALS.
+    def _approach(self, thing, turn, drive, wait):
+        rover = vrjs.device("rover")
+        if rover is None:
+            raise AttributeError("drive_to, turn_to and go_to only work with the Rover")
+        done = rover.approach(str(thing), turn, drive)
+        return done if wait else None
+
+    def turn_to(self, thing, wait=True):
+        return self._approach(thing, True, False, wait)
+
+    def drive_to(self, thing, wait=True):
+        return self._approach(thing, False, True, wait)
+
+    def go_to(self, thing, wait=True):
+        return self._approach(thing, True, True, wait)
+
     def stop(self, *_):
         self._dt.stop()
 
@@ -387,6 +405,70 @@ class Location:
         return round(self._d.angle(), 2) % 360
 
 
+class Rover(_Device):
+    """Rover Rescue: minerals, enemies, battery and XP."""
+
+    def pickup(self, thing):
+        self._d.pickup(str(thing))
+
+    def drop(self, thing):
+        self._d.drop(str(thing))
+
+    def use(self, thing):
+        self._d.use(str(thing))
+
+    def absorb_radiation(self, thing):
+        self._d.absorb_radiation(str(thing))
+
+    def standby(self, percent):
+        return self._d.standby(percent)
+
+    def angle(self, thing, units=DEGREES):
+        return self._d.angle(str(thing))
+
+    def get_distance(self, thing, units=MM):
+        return _from_mm(self._d.get_distance(str(thing)), units)
+
+    def location(self, thing, axis, units=MM):
+        return _from_mm(self._d.location(str(thing), str(axis)), units)
+
+    def battery(self):
+        return self._d.battery_level()
+
+    def minerals_stored(self):
+        return self._d.minerals_stored()
+
+    def storage_capacity(self):
+        return self._d.storage_capacity()
+
+    def level(self):
+        return self._d.current_level()
+
+    def exp(self):
+        return self._d.exp()
+
+    def enemy_level(self):
+        return self._d.enemy_level()
+
+    def enemy_radiation(self):
+        return self._d.enemy_radiation()
+
+    def detects(self, thing):
+        return self._d.detects(str(thing))
+
+    def sees(self, thing):
+        return self._d.sees(str(thing))
+
+    def under_attack(self):
+        return self._d.under_attack()
+
+    def on_under_attack(self, callback, *args):
+        _on("rover.under_attack", callback, *args)
+
+    def on_level_up(self, callback, *args):
+        _on("rover.level_up", callback, *args)
+
+
 # --------------------------------------------------------------- events
 
 
@@ -418,6 +500,7 @@ _CLASSES = {
     "Distance": Distance,
     "Pen": Pen,
     "Electromagnet": Electromagnet,
+    "Rover": Rover,
 }
 
 

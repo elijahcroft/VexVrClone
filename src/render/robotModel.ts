@@ -6,6 +6,7 @@ const PAINT: Record<RobotKind, { body: number; plate: number }> = {
   vr_robot: { body: 0x3b4252, plate: 0xff8a3d },
   underwater: { body: 0x1f4e79, plate: 0xffd23f },
   mazebot: { body: 0x2f3b2f, plate: 0x4ade80 },
+  rover: { body: 0x7a5230, plate: 0xe0e4ea },
 };
 
 /**
@@ -39,6 +40,12 @@ export function buildRobotModel(kind: RobotKind = "vr_robot") {
   if (kind === "mazebot") {
     // Side distance sensors.
     for (const sx of [-1, 1]) box(12, 20, 28, 0x2e3440, sx * (bodyW / 2 + 6), bottom + 14 + 40, 0);
+  }
+  if (kind === "rover") {
+    // Antenna mast and a claw at the front.
+    box(6, 70, 6, 0xbfc6d0, -bodyW / 2 + 12, bottom + 14 + 95, 50);
+    box(16, 10, 16, 0xff5a5a, -bodyW / 2 + 12, bottom + 14 + 133, 50);
+    for (const sx of [-1, 1]) box(8, 14, 34, 0xbfc6d0, sx * 22, bottom + 20, -l / 2 - 12);
   }
   // Brain with a small screen.
   box(70, 34, 60, 0x2e3440, 0, bottom + 14 + 75, 30);

@@ -133,10 +133,20 @@ export class Runner {
     }
     const api = robot.device<Record<string, unknown>>(device);
     if (!api) return "?";
-    const aliases: Record<string, string> = { distance: "get_distance", color: "color" };
+    const aliases: Record<string, string> = {
+      distance: "get_distance",
+      color: "color",
+      battery: "battery_level",
+      level: "current_level",
+    };
     const fn = api[aliases[prop] ?? prop];
     if (typeof fn !== "function") return "?";
-    const value = (fn as () => unknown).call(api);
+    let value: unknown;
+    try {
+      value = (fn as () => unknown).call(api);
+    } catch {
+      return "?"; // needs an argument (e.g. rover.angle)
+    }
     return typeof value === "number" ? String(Math.round(value * 100) / 100) : String(value);
   }
 

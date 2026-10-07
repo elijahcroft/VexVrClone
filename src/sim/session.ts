@@ -46,6 +46,7 @@ export class SimSession {
       colorAt: def.colorAt && ((x, y) => def.colorAt!(x, y, this.layout)),
       onDraw: () => (this.floorDirty = true),
     });
+    def.setup?.(this.world, this.robot, this.layout);
     if (def.onStep) this.world.onStep((dt) => def.onStep!(this.world, this.robot, this.layout, dt));
   }
 

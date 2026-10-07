@@ -8,6 +8,7 @@ import { gridMap } from "./gridMap";
 import { hiddenPixelArt } from "./hiddenPixelArt";
 import { lineDetector } from "./lineDetector";
 import { numberGridMap } from "./numberGridMap";
+import { roverRescue } from "./roverRescue";
 import type { AnyPlayground } from "./types";
 import { dynamicWallMaze, wallMaze, wallMazePlus } from "./wallMaze";
 
@@ -30,6 +31,7 @@ export const PLAYGROUNDS: AnyPlayground[] = [
   artCanvasPlus,
   castleCrasherPlus,
   wallMazePlus,
+  roverRescue,
 ];
 
 export function getPlayground(id: string) {

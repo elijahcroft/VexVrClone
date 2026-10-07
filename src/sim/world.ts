@@ -73,6 +73,7 @@ export class World {
   private waiters: Waiter[] = [];
   private stepHooks: ((dt: number) => void)[] = [];
   private afterStepHooks: (() => void)[] = [];
+  private addedHooks: ((obj: SimObject) => void)[] = [];
 
   constructor() {
     this.physics = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
@@ -91,6 +92,16 @@ export class World {
   /** Run `fn` after each physics step. */
   onAfterStep(fn: () => void) {
     this.afterStepHooks.push(fn);
+  }
+
+  /** Run `fn` for objects added after the playground was built (respawns). */
+  onAdded(fn: (obj: SimObject) => void) {
+    this.addedHooks.push(fn);
+  }
+
+  /** Tell the renderer about an object added mid-run. */
+  notifyAdded(obj: SimObject) {
+    for (const hook of this.addedHooks) hook(obj);
   }
 
   step() {

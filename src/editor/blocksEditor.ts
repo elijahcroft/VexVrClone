@@ -32,6 +32,7 @@ function buildToolbox(devices: Set<string>) {
       contents: [
         block("vr_drive"),
         block("vr_drive_for", { DISTANCE: number(200) }),
+        ...(has("rover") ? [block("vr_rover_drive_to")] : []),
         block("vr_turn"),
         block("vr_turn_for", { ANGLE: number(90) }),
         block("vr_turn_to_heading", { ANGLE: number(90) }),
@@ -67,6 +68,16 @@ function buildToolbox(devices: Set<string>) {
       ],
     },
     has("magnet") && { kind: "category", name: "Magnet", colour: COLORS.magnet, contents: [block("vr_magnet")] },
+    has("rover") && {
+      kind: "category",
+      name: "Rover",
+      colour: COLORS.rover,
+      contents: [
+        block("vr_rover_action"),
+        block("vr_rover_absorb"),
+        block("vr_rover_standby", { PERCENT: number(100) }),
+      ],
+    },
     {
       kind: "category",
       name: "Events",
@@ -75,6 +86,7 @@ function buildToolbox(devices: Set<string>) {
         block("vr_when_started"),
         ...deviceBlock("vr_when_bumper", bumper),
         ...deviceBlock("vr_when_eye", eye),
+        ...(has("rover") ? [block("vr_rover_when")] : []),
         block("vr_when_timer"),
         block("vr_when_i_receive"),
         block("vr_broadcast"),
@@ -121,9 +133,17 @@ function buildToolbox(devices: Set<string>) {
           ...deviceBlock("vr_distance_found", distance),
           ...deviceBlock("vr_distance", distance),
         ]),
-        label("Location"),
-        block("vr_position"),
-        block("vr_position_angle"),
+        ...section("Rover", has("rover")
+          ? [
+              block("vr_rover_value"),
+              block("vr_rover_under_attack"),
+              block("vr_rover_detects"),
+              block("vr_rover_angle"),
+              block("vr_rover_distance"),
+              block("vr_rover_location"),
+            ]
+          : []),
+        ...section("Location", has("location") ? [block("vr_position"), block("vr_position_angle")] : []),
       ],
     },
     {
